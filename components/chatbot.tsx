@@ -67,7 +67,7 @@ export function Chatbot() {
                 <span className="mb-1 px-1 text-xs text-muted-foreground">
                   Proxie
                 </span>
-                <div className="max-w-[min(75%,20rem)] rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground">
+                <div className="max-w-[min(75%,20rem)] break-words rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground">
                   {
                     "Hey! I'm Proxie, Nicole's career digital twin. I'm a bot, so I won't pretend otherwise — but I do know her work really well. Ask me anything."
                   }
@@ -114,7 +114,7 @@ export function Chatbot() {
 
                       {/* Message Bubble */}
                       <div
-                        className={`max-w-[min(75%,20rem)] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                        className={`max-w-[min(75%,20rem)] break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                           isUser
                             ? "rounded-br-md bg-primary text-primary-foreground"
                             : "rounded-bl-md bg-secondary text-secondary-foreground"
