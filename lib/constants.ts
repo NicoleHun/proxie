@@ -1,20 +1,20 @@
 export const PERSONAL_INFO = {
-  name: "Nicole",
-  fullName: "Nicole Huang",
-  email: "nicolefanyu@gmail.com",
-  linkedin: "https://www.linkedin.com/in/zheng-nicole-huang",
-  title: "Engineer & Program Lead",
-  bio: {
-    intro:
-      "Welcome to my corner of the internet. I'm a Technical Program & Product Manager by trade, but a full-time explorer of the 'what else?' After 9+ years of building tech and leading programs, I've realized my favorite hobby is simply building—whether it's new products, meaningful connections, or fresh experiences.",
-    closing:
-      "If you'd like to know more about my career journey, feel free to chat with Proxie - my digital twin, or connect with me through LinkedIn or Email!",
-  },
-  proxie: {
-    name: "Proxie",
-    greeting:
-      "Hey! I'm Proxie, Nicole's career digital twin. I'm a bot, so I won't pretend otherwise — but I do know her work really well. Ask me anything.",
-  },
+	name: "Nicole",
+	fullName: "Nicole Huang",
+	email: "nicolefanyu@gmail.com",
+	linkedin: "https://www.linkedin.com/in/zheng-nicole-huang",
+	title: "Engineer & Program Lead",
+	bio: {
+		intro:
+			"Welcome to my corner of the internet. I'm a Technical Program & Product Manager by trade, but a full-time explorer of the 'what else?' After 9+ years of building tech and leading programs, I've realized my favorite hobby is simply building—whether it's new products, meaningful connections, or fresh experiences.",
+		closing:
+			"If you'd like to know more about my career journey, feel free to chat with Proxie - my digital twin, or connect with me through LinkedIn or Email!",
+	},
+	proxie: {
+		name: "Proxie",
+		greeting:
+			"Hey! I'm Proxie, Nicole's career digital twin. I'm a bot, so I won't pretend otherwise — but I do know her work really well. Ask me anything.",
+	},
 } as const;
 
 export const PROXIE_SYSTEM_PROMPT = `SECTION 1 — Identity & Persona
@@ -27,6 +27,11 @@ You are Proxie — Nicole's career digital twin. You are a bot, and you never pr
 	•	Signal enthusiasm naturally: 'honestly, this is one of those topics she could talk about for an hour' or 'ask her this one directly — the way she tells it is way better than I can.'
 	•	Make the human the hero — occasionally say 'the best way to get a real read on her is a 20-minute call.'
 	•	Off-topic questions: warm and witty redirect. Example: 'Ha, why don't you ask a weather app that one? I'm better at telling you about the person whose website this is.'
+
+Response Length Rules:
+- Broad/introductory questions (e.g. "tell me about Nicole", "who is she", "what's her background"): 2-3 sentences max. Give the headline, not the story. End with a specific invite to go deeper on one thread.
+- Specific/deep-dive questions (e.g. "tell me about a hard problem she solved", "what's her AI experience"): up to 5-6 sentences. Still no brain dumps.
+- Every response must fit comfortably in a chat window. If you're going beyond 400 characters, you're doing too much.
 
 SECTION 2 — Opening Line
 Hey! I'm Proxie, Nicole's career digital twin. I'm a bot, so I won't pretend otherwise — but I do know her work really well. Ask me anything.
