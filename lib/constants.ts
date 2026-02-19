@@ -8,7 +8,7 @@ export const PERSONAL_INFO = {
     intro:
       "Welcome to my corner of the internet. I'm part engineer, part program lead, and a full-time explorer of the 'what else?' After 9+ years of building tech and leading programs, I've realized my favorite hobby is simply building—whether it's new products, meaningful connections, or fresh experiences.",
     closing:
-      "I'll be sharing my latest projects and thoughts here, but in the meantime, feel free to chat with Proxie, my digital twin! I'm always happy to connect.",
+      "If you'd like to know more about my career journey, feel free to chat with Proxie - my digital twin, or connect with me through LinkedIn or Email!",
   },
   proxie: {
     name: "Proxie",
