@@ -1,23 +1,23 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport } from "ai"
 import { Send, ThumbsUp, ThumbsDown, User } from "lucide-react"
 import { PERSONAL_INFO } from "@/lib/constants"
 
 type Rating = "up" | "down" | null
 
+type Message = {
+  id: string
+  role: "user" | "assistant"
+  content: string
+}
+
 export function Chatbot() {
   const [input, setInput] = useState("")
   const [ratings, setRatings] = useState<Record<string, Rating>>({})
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
-  })
-
-  const isLoading = status === "streaming" || status === "submitted"
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -30,11 +30,40 @@ export function Chatbot() {
     }))
   }
 
-  function getMessageText(parts: Array<{ type: string; text?: string }>) {
-    return parts
-      .filter((p): p is { type: "text"; text: string } => p.type === "text")
-      .map((p) => p.text)
-      .join("")
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!input.trim() || isLoading) return
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input,
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+    setInput("")
+    setIsLoading(true)
+
+    // TODO: Replace this with your own backend API call
+    // Example:
+    // const response = await fetch("/api/your-chat-endpoint", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({ messages: [...messages, userMessage] }),
+    // })
+    // const data = await response.json()
+
+    // Placeholder response
+    setTimeout(() => {
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content:
+          "Chat functionality is currently being set up. Please connect this to your backend API.",
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+      setIsLoading(false)
+    }, 1000)
   }
 
   return (
@@ -71,7 +100,7 @@ export function Chatbot() {
                 <div className="max-w-[min(75%,20rem)] break-words rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground">
                   {PERSONAL_INFO.proxie.greeting}
                 </div>
-                
+
                 {/* Thumbs Up / Down for opening message */}
                 <div className="mt-1.5 flex items-center gap-1 px-1">
                   <button
@@ -104,9 +133,6 @@ export function Chatbot() {
             <div className="flex flex-col gap-5">
               {messages.map((message) => {
                 const isUser = message.role === "user"
-                const text = getMessageText(
-                  message.parts as Array<{ type: string; text?: string }>
-                )
 
                 return (
                   <div
@@ -145,7 +171,7 @@ export function Chatbot() {
                             : "rounded-bl-md bg-secondary text-secondary-foreground"
                         }`}
                       >
-                        {text}
+                        {message.content}
                       </div>
 
                       {/* Thumbs Up / Down for assistant messages */}
@@ -181,7 +207,7 @@ export function Chatbot() {
               })}
 
               {/* Typing indicator */}
-              {isLoading && messages[messages.length - 1]?.role === "user" && (
+              {isLoading && (
                 <div className="flex items-end gap-2.5">
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary text-xs font-semibold text-primary-foreground">
                     P
@@ -206,15 +232,7 @@ export function Chatbot() {
 
           {/* Input Area */}
           <div className="border-t border-border p-3">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (!input.trim() || isLoading) return
-                sendMessage({ text: input })
-                setInput("")
-              }}
-              className="flex items-center gap-2"
-            >
+            <form onSubmit={handleSubmit} className="flex items-center gap-2">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
