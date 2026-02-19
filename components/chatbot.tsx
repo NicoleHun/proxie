@@ -160,7 +160,10 @@ export function Chatbot() {
                 <span className="mb-1 px-1 text-xs text-muted-foreground">
                   {PERSONAL_INFO.proxie.name}
                 </span>
-                <div className="inline-block max-w-md rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground">
+                <div 
+                  className="max-w-md rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground"
+                  style={{ width: 'fit-content' }}
+                >
                   {PERSONAL_INFO.proxie.greeting}
                 </div>
 
@@ -224,11 +227,12 @@ export function Chatbot() {
 
                       {/* Message Bubble */}
                       <div
-                        className={`inline-block max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                        className={`max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                           isUser
                             ? "rounded-br-md bg-primary text-primary-foreground"
                             : "rounded-bl-md bg-secondary text-secondary-foreground"
                         }`}
+                        style={{ width: 'fit-content' }}
                       >
                         {message.content}
                       </div>
