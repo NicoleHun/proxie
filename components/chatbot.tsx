@@ -72,6 +72,32 @@ export function Chatbot() {
                     "Hey! I'm Proxie, Nicole's career digital twin. I'm a bot, so I won't pretend otherwise — but I do know her work really well. Ask me anything."
                   }
                 </div>
+                
+                {/* Thumbs Up / Down for opening message */}
+                <div className="mt-1.5 flex items-center gap-1 px-1">
+                  <button
+                    onClick={() => handleRate("opening-message", "up")}
+                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                      ratings["opening-message"] === "up"
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
+                    }`}
+                    aria-label="Rate helpful"
+                  >
+                    <ThumbsUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleRate("opening-message", "down")}
+                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                      ratings["opening-message"] === "down"
+                        ? "bg-destructive/15 text-destructive"
+                        : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
+                    }`}
+                    aria-label="Rate unhelpful"
+                  >
+                    <ThumbsDown className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
 
