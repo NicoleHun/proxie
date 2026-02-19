@@ -64,10 +64,11 @@ export function HeroSection() {
           <div className="relative">
             <button
               onClick={() => setShowEmailPopup(!showEmailPopup)}
-              className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+              className="flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
               aria-label="Show email"
             >
               <Mail className="h-4 w-4" />
+              <span>Email</span>
             </button>
 
             {/* Email Popup */}
