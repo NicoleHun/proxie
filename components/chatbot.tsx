@@ -3,8 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
-import { Send, MessageCircle, ThumbsUp, ThumbsDown, User } from "lucide-react"
-import Image from "next/image"
+import { Send, ThumbsUp, ThumbsDown, User } from "lucide-react"
 
 type Rating = "up" | "down" | null
 
@@ -42,21 +41,15 @@ export function Chatbot() {
       <div className="mx-auto max-w-2xl">
         {/* Header */}
         <div className="mb-6 flex items-center gap-3">
-          <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full border-2 border-primary/20">
-            <Image
-              src="/images/proxie-avatar.jpg"
-              alt="Proxie avatar"
-              fill
-              sizes="40px"
-              className="object-cover"
-            />
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 font-semibold text-primary">
+            P
           </div>
           <div>
             <h2 className="font-serif text-xl font-semibold text-foreground">
               Chat with Proxie
             </h2>
             <p className="text-sm text-muted-foreground">
-              Curious about my experience? Start a conversation below.
+              {"Nicole's career digital twin — ask me anything!"}
             </p>
           </div>
         </div>
@@ -65,28 +58,24 @@ export function Chatbot() {
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           {/* Messages Area */}
           <div className="h-96 overflow-y-auto p-4">
-            {messages.length === 0 && (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-primary/20">
-                  <Image
-                    src="/images/proxie-avatar.jpg"
-                    alt="Proxie avatar"
-                    fill
-                    sizes="64px"
-                    className="object-cover"
-                  />
-                </div>
-                <div>
-                  <p className="mb-1 text-sm font-medium text-foreground">
-                    Proxie
-                  </p>
-                  <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-                    {"Hi! I'm Proxie. Ask me about work experience, skills, projects, or anything you'd like to know."}
-                  </p>
+            {/* Opening Message */}
+            <div className="mb-5 flex items-end gap-2.5">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-xs font-semibold text-primary">
+                P
+              </div>
+              <div className="flex flex-col items-start">
+                <span className="mb-1 px-1 text-xs text-muted-foreground">
+                  Proxie
+                </span>
+                <div className="max-w-[min(75%,20rem)] rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground">
+                  {
+                    "Hey! I'm Proxie, Nicole's career digital twin. I'm a bot, so I won't pretend otherwise — but I do know her work really well. Ask me anything."
+                  }
                 </div>
               </div>
-            )}
+            </div>
 
+            {/* User Messages */}
             <div className="flex flex-col gap-5">
               {messages.map((message) => {
                 const isUser = message.role === "user"
@@ -107,14 +96,8 @@ export function Chatbot() {
                         <User className="h-4 w-4" />
                       </div>
                     ) : (
-                      <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border border-border">
-                        <Image
-                          src="/images/proxie-avatar.jpg"
-                          alt="Proxie"
-                          fill
-                          sizes="32px"
-                          className="object-cover"
-                        />
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-xs font-semibold text-primary">
+                        P
                       </div>
                     )}
 
@@ -175,14 +158,8 @@ export function Chatbot() {
               {/* Typing indicator */}
               {isLoading && messages[messages.length - 1]?.role === "user" && (
                 <div className="flex items-end gap-2.5">
-                  <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border border-border">
-                    <Image
-                      src="/images/proxie-avatar.jpg"
-                      alt="Proxie"
-                      fill
-                      sizes="32px"
-                      className="object-cover"
-                    />
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-xs font-semibold text-primary">
+                    P
                   </div>
                   <div className="flex flex-col items-start">
                     <span className="mb-1 px-1 text-xs text-muted-foreground">
@@ -216,7 +193,7 @@ export function Chatbot() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask Proxie about my experience, skills..."
+                placeholder="Ask Proxie about Nicole's experience, skills..."
                 disabled={isLoading}
                 className="flex-1 rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
               />
