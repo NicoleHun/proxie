@@ -6,7 +6,7 @@ export const PERSONAL_INFO = {
   title: "Engineer & Program Lead",
   bio: {
     intro:
-      "Welcome to my corner of the internet. I'm part engineer, part program lead, and a full-time explorer of the 'what else?' After 9+ years of building tech and leading programs, I've realized my favorite hobby is simply building—whether it's new products, meaningful connections, or fresh experiences.",
+      "Welcome to my corner of the internet. I'm a Technical Program & Product Manager by trade, but a full-time explorer of the 'what else?' After 9+ years of building tech and leading programs, I've realized my favorite hobby is simply building—whether it's new products, meaningful connections, or fresh experiences.",
     closing:
       "If you'd like to know more about my career journey, feel free to chat with Proxie - my digital twin, or connect with me through LinkedIn or Email!",
   },
