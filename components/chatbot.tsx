@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect } from "react"
 import { Send, ThumbsUp, ThumbsDown, User } from "lucide-react"
 import { PERSONAL_INFO } from "@/lib/constants"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import Image from "next/image"
 
 type Rating = "up" | "down" | null
 
@@ -131,11 +134,16 @@ export function Chatbot() {
 
   return (
     <section className="px-6 py-10">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-4xl">
         {/* Header */}
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary font-semibold text-primary-foreground">
-            P
+          <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full border-2 border-primary/80">
+            <Image
+              src="/proxie-avatar.png"
+              alt="Proxie Avatar"
+              fill
+              className="object-cover"
+            />
           </div>
           <div>
             <h2 className="font-serif text-xl font-semibold text-foreground">
@@ -150,21 +158,28 @@ export function Chatbot() {
         {/* Chat Container */}
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           {/* Messages Area */}
-          <div className="h-96 overflow-y-auto p-4">
+          <div className="h-[518px] overflow-y-auto p-4">
             {/* Opening Message */}
             <div className="mb-5 flex items-end gap-2.5">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary text-xs font-semibold text-primary-foreground">
-                P
+              <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-primary/80">
+                <Image
+                  src="/proxie-avatar.png"
+                  alt="Proxie Avatar"
+                  fill
+                  className="object-cover"
+                />
               </div>
               <div className="flex flex-col items-start">
                 <span className="mb-1 px-1 text-xs text-muted-foreground">
                   {PERSONAL_INFO.proxie.name}
                 </span>
                 <div 
-                  className="max-w-md rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground"
+                  className="max-w-[60%] rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
                   style={{ width: 'fit-content' }}
                 >
-                  {PERSONAL_INFO.proxie.greeting}
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {PERSONAL_INFO.proxie.greeting}
+                  </ReactMarkdown>
                 </div>
 
                 {/* Thumbs Up / Down for opening message */}
@@ -210,8 +225,13 @@ export function Chatbot() {
                         <User className="h-4 w-4" />
                       </div>
                     ) : (
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary text-xs font-semibold text-primary-foreground">
-                        P
+                      <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-primary/80">
+                        <Image
+                          src="/proxie-avatar.png"
+                          alt="Proxie Avatar"
+                          fill
+                          className="object-cover"
+                        />
                       </div>
                     )}
 
@@ -227,14 +247,16 @@ export function Chatbot() {
 
                       {/* Message Bubble */}
                       <div
-                        className={`max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                        className={`max-w-[60%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 ${
                           isUser
-                            ? "rounded-br-md bg-primary text-primary-foreground"
-                            : "rounded-bl-md bg-secondary text-secondary-foreground"
+                            ? "rounded-br-md bg-primary text-primary-foreground prose-headings:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground prose-a:text-primary-foreground"
+                            : "rounded-bl-md bg-secondary text-secondary-foreground prose-headings:text-secondary-foreground prose-strong:text-secondary-foreground prose-code:text-secondary-foreground prose-a:text-secondary-foreground"
                         }`}
                         style={{ width: 'fit-content' }}
                       >
-                        {message.content}
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
                       </div>
 
                       {/* Thumbs Up / Down for assistant messages */}
@@ -270,8 +292,13 @@ export function Chatbot() {
               {/* Typing indicator */}
               {isLoading && (
                 <div className="flex items-end gap-2.5">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary text-xs font-semibold text-primary-foreground">
-                    P
+                  <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-primary/80">
+                    <Image
+                      src="/proxie-avatar.png"
+                      alt="Proxie Avatar"
+                      fill
+                      className="object-cover"
+                    />
                   </div>
                   <div className="flex flex-col items-start">
                     <span className="mb-1 px-1 text-xs text-muted-foreground">
