@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react"
 import { Send, ThumbsUp, ThumbsDown, User } from "lucide-react"
 import { PERSONAL_INFO } from "@/lib/constants"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 type Rating = "up" | "down" | null
 
@@ -161,10 +163,12 @@ export function Chatbot() {
                   {PERSONAL_INFO.proxie.name}
                 </span>
                 <div 
-                  className="max-w-md rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground"
+                  className="max-w-md rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
                   style={{ width: 'fit-content' }}
                 >
-                  {PERSONAL_INFO.proxie.greeting}
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {PERSONAL_INFO.proxie.greeting}
+                  </ReactMarkdown>
                 </div>
 
                 {/* Thumbs Up / Down for opening message */}
@@ -227,14 +231,16 @@ export function Chatbot() {
 
                       {/* Message Bubble */}
                       <div
-                        className={`max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                        className={`max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 ${
                           isUser
-                            ? "rounded-br-md bg-primary text-primary-foreground"
-                            : "rounded-bl-md bg-secondary text-secondary-foreground"
+                            ? "rounded-br-md bg-primary text-primary-foreground prose-headings:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground prose-a:text-primary-foreground"
+                            : "rounded-bl-md bg-secondary text-secondary-foreground prose-headings:text-secondary-foreground prose-strong:text-secondary-foreground prose-code:text-secondary-foreground prose-a:text-secondary-foreground"
                         }`}
                         style={{ width: 'fit-content' }}
                       >
-                        {message.content}
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
                       </div>
 
                       {/* Thumbs Up / Down for assistant messages */}
