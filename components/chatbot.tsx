@@ -42,7 +42,7 @@ export function Chatbot() {
       <div className="mx-auto max-w-2xl">
         {/* Header */}
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 font-semibold text-primary">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary font-semibold text-primary-foreground">
             P
           </div>
           <div>
@@ -61,7 +61,7 @@ export function Chatbot() {
           <div className="h-96 overflow-y-auto p-4">
             {/* Opening Message */}
             <div className="mb-5 flex items-end gap-2.5">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-xs font-semibold text-primary">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary text-xs font-semibold text-primary-foreground">
                 P
               </div>
               <div className="flex flex-col items-start">
@@ -121,7 +121,7 @@ export function Chatbot() {
                         <User className="h-4 w-4" />
                       </div>
                     ) : (
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-xs font-semibold text-primary">
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary text-xs font-semibold text-primary-foreground">
                         P
                       </div>
                     )}
@@ -183,7 +183,7 @@ export function Chatbot() {
               {/* Typing indicator */}
               {isLoading && messages[messages.length - 1]?.role === "user" && (
                 <div className="flex items-end gap-2.5">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-xs font-semibold text-primary">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary text-xs font-semibold text-primary-foreground">
                     P
                   </div>
                   <div className="flex flex-col items-start">

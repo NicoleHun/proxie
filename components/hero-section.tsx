@@ -35,12 +35,12 @@ export function HeroSection() {
     <section className="flex flex-col items-center gap-10 px-6 py-16 md:flex-row md:items-start md:gap-16">
       {/* Profile Picture */}
       <div className="flex-shrink-0">
-        <div className="relative h-64 w-56 overflow-hidden rounded-[50%] border-4 border-primary/20 shadow-lg md:h-80 md:w-64">
+        <div className="relative h-96 w-80 overflow-hidden rounded-[50%] border-4 border-primary/20 shadow-lg md:h-[30rem] md:w-96">
           <Image
             src="/images/profile.jpg"
             alt="Nicole's profile photo"
             fill
-            sizes="(max-width: 768px) 224px, 256px"
+            sizes="(max-width: 768px) 320px, 384px"
             className="object-cover"
             priority
           />
