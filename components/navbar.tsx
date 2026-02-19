@@ -8,7 +8,7 @@ export function Navbar() {
           href="/"
           className="font-serif text-xl font-semibold tracking-tight text-foreground transition-colors hover:text-primary"
         >
-          Portfolio
+          Main
         </Link>
       </nav>
     </header>
