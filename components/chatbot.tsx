@@ -17,22 +17,72 @@ export function Chatbot() {
   const [ratings, setRatings] = useState<Record<string, Rating>>({})
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Initialize or retrieve session ID
+    let id = localStorage.getItem("proxie_session_id")
+    if (!id) {
+      id = crypto.randomUUID()
+      localStorage.setItem("proxie_session_id", id)
+    }
+    setSessionId(id)
+
+    // Load existing messages if any
+    const fetchSession = async () => {
+      try {
+        const res = await fetch(`/api/session?session_id=${id}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.conversation_history) {
+            setMessages(data.conversation_history.map((m: any, i: number) => ({
+              id: `msg-${i}`,
+              role: m.role,
+              content: m.content
+            })))
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch session:", err)
+      }
+    }
+    fetchSession()
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  function handleRate(messageId: string, rating: Rating) {
+  async function handleRate(messageId: string, rating: Rating, index?: number) {
+    if (!sessionId || index === undefined) return
+
+    const newRating = ratings[messageId] === rating ? null : rating
     setRatings((prev) => ({
       ...prev,
-      [messageId]: prev[messageId] === rating ? null : rating,
+      [messageId]: newRating,
     }))
+
+    if (newRating) {
+      try {
+        await fetch("/api/rating", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: sessionId,
+            message_index: index,
+            rating: newRating === "up" ? "thumbs_up" : "thumbs_down"
+          }),
+        })
+      } catch (err) {
+        console.error("Failed to submit rating:", err)
+      }
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!input.trim() || isLoading) return
+    if (!input.trim() || isLoading || !sessionId) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -44,26 +94,39 @@ export function Chatbot() {
     setInput("")
     setIsLoading(true)
 
-    // TODO: Replace this with your own backend API call
-    // Example:
-    // const response = await fetch("/api/your-chat-endpoint", {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify({ messages: [...messages, userMessage] }),
-    // })
-    // const data = await response.json()
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: input,
+          session_id: sessionId
+        }),
+      })
 
-    // Placeholder response
-    setTimeout(() => {
-      const assistantMessage: Message = {
+      const data = await response.json()
+
+      if (data.reply) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.reply,
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      } else {
+        throw new Error(data.error || "Failed to get reply")
+      }
+    } catch (err) {
+      console.error("Chat error:", err)
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content:
-          "Chat functionality is currently being set up. Please connect this to your backend API.",
+        content: "Sorry, I'm having trouble connecting right now. Please try again later.",
       }
-      setMessages((prev) => [...prev, assistantMessage])
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -105,22 +168,20 @@ export function Chatbot() {
                 <div className="mt-1.5 flex items-center gap-1 px-1">
                   <button
                     onClick={() => handleRate("opening-message", "up")}
-                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                      ratings["opening-message"] === "up"
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
-                    }`}
+                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings["opening-message"] === "up"
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
+                      }`}
                     aria-label="Rate helpful"
                   >
                     <ThumbsUp className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => handleRate("opening-message", "down")}
-                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                      ratings["opening-message"] === "down"
-                        ? "bg-destructive/15 text-destructive"
-                        : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
-                    }`}
+                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings["opening-message"] === "down"
+                      ? "bg-destructive/15 text-destructive"
+                      : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
+                      }`}
                     aria-label="Rate unhelpful"
                   >
                     <ThumbsDown className="h-3.5 w-3.5" />
@@ -131,15 +192,14 @@ export function Chatbot() {
 
             {/* User Messages */}
             <div className="flex flex-col gap-5">
-              {messages.map((message) => {
+              {messages.map((message, index) => {
                 const isUser = message.role === "user"
 
                 return (
                   <div
                     key={message.id}
-                    className={`flex items-end gap-2.5 ${
-                      isUser ? "flex-row-reverse" : ""
-                    }`}
+                    className={`flex items-end gap-2.5 ${isUser ? "flex-row-reverse" : ""
+                      }`}
                   >
                     {/* Avatar */}
                     {isUser ? (
@@ -154,9 +214,8 @@ export function Chatbot() {
 
                     {/* Bubble + Rating */}
                     <div
-                      className={`flex flex-col ${
-                        isUser ? "items-end" : "items-start"
-                      }`}
+                      className={`flex flex-col ${isUser ? "items-end" : "items-start"
+                        }`}
                     >
                       {/* Label */}
                       <span className="mb-1 px-1 text-xs text-muted-foreground">
@@ -165,11 +224,10 @@ export function Chatbot() {
 
                       {/* Message Bubble */}
                       <div
-                        className={`max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words ${
-                          isUser
-                            ? "rounded-br-md bg-primary text-primary-foreground"
-                            : "rounded-bl-md bg-secondary text-secondary-foreground"
-                        }`}
+                        className={`max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words ${isUser
+                          ? "rounded-br-md bg-primary text-primary-foreground"
+                          : "rounded-bl-md bg-secondary text-secondary-foreground"
+                          }`}
                       >
                         {message.content}
                       </div>
@@ -178,23 +236,21 @@ export function Chatbot() {
                       {!isUser && (
                         <div className="mt-1.5 flex items-center gap-1 px-1">
                           <button
-                            onClick={() => handleRate(message.id, "up")}
-                            className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                              ratings[message.id] === "up"
-                                ? "bg-primary/15 text-primary"
-                                : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
-                            }`}
+                            onClick={() => handleRate(message.id, "up", index)}
+                            className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings[message.id] === "up"
+                              ? "bg-primary/15 text-primary"
+                              : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
+                              }`}
                             aria-label="Rate helpful"
                           >
                             <ThumbsUp className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => handleRate(message.id, "down")}
-                            className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                              ratings[message.id] === "down"
-                                ? "bg-destructive/15 text-destructive"
-                                : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
-                            }`}
+                            onClick={() => handleRate(message.id, "down", index)}
+                            className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings[message.id] === "down"
+                              ? "bg-destructive/15 text-destructive"
+                              : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
+                              }`}
                             aria-label="Rate unhelpful"
                           >
                             <ThumbsDown className="h-3.5 w-3.5" />
