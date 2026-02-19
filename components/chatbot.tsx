@@ -131,7 +131,7 @@ export function Chatbot() {
 
   return (
     <section className="px-6 py-10">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary font-semibold text-primary-foreground">
@@ -150,7 +150,7 @@ export function Chatbot() {
         {/* Chat Container */}
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           {/* Messages Area */}
-          <div className="h-96 overflow-y-auto p-4">
+          <div className="h-[576px] overflow-y-auto p-4">
             {/* Opening Message */}
             <div className="mb-5 flex items-end gap-2.5">
               <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/80 bg-primary text-xs font-semibold text-primary-foreground">
