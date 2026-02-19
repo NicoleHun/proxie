@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
 import { Send, ThumbsUp, ThumbsDown, User } from "lucide-react"
+import { PERSONAL_INFO } from "@/lib/constants"
 
 type Rating = "up" | "down" | null
 
@@ -46,10 +47,10 @@ export function Chatbot() {
           </div>
           <div>
             <h2 className="font-serif text-xl font-semibold text-foreground">
-              Chat with Proxie
+              Chat with {PERSONAL_INFO.proxie.name}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {"Nicole's career digital twin — ask me anything!"}
+              {`${PERSONAL_INFO.name}'s career digital twin — ask me anything!`}
             </p>
           </div>
         </div>
@@ -65,12 +66,10 @@ export function Chatbot() {
               </div>
               <div className="flex flex-col items-start">
                 <span className="mb-1 px-1 text-xs text-muted-foreground">
-                  Proxie
+                  {PERSONAL_INFO.proxie.name}
                 </span>
                 <div className="max-w-[min(75%,20rem)] break-words rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground">
-                  {
-                    "Hey! I'm Proxie, Nicole's career digital twin. I'm a bot, so I won't pretend otherwise — but I do know her work really well. Ask me anything."
-                  }
+                  {PERSONAL_INFO.proxie.greeting}
                 </div>
                 
                 {/* Thumbs Up / Down for opening message */}
@@ -135,7 +134,7 @@ export function Chatbot() {
                     >
                       {/* Label */}
                       <span className="mb-1 px-1 text-xs text-muted-foreground">
-                        {isUser ? "You" : "Proxie"}
+                        {isUser ? "You" : PERSONAL_INFO.proxie.name}
                       </span>
 
                       {/* Message Bubble */}
@@ -189,7 +188,7 @@ export function Chatbot() {
                   </div>
                   <div className="flex flex-col items-start">
                     <span className="mb-1 px-1 text-xs text-muted-foreground">
-                      Proxie
+                      {PERSONAL_INFO.proxie.name}
                     </span>
                     <div className="rounded-2xl rounded-bl-md bg-secondary px-4 py-3">
                       <div className="flex gap-1.5">
@@ -219,7 +218,7 @@ export function Chatbot() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask Proxie about Nicole's experience, skills..."
+                placeholder={`Ask ${PERSONAL_INFO.proxie.name} about ${PERSONAL_INFO.name}'s experience, skills...`}
                 disabled={isLoading}
                 className="flex-1 rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
               />

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { DM_Sans, Lora, Inter, Playfair_Display } from 'next/font/google'
+import { DM_Sans, Lora } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
@@ -13,19 +13,9 @@ const lora = Lora({
   variable: '--font-lora',
 })
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-})
-
-const playfairDisplay = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
-})
-
 export const metadata: Metadata = {
-  title: 'Personal Portfolio',
-  description: 'Welcome to my personal website. Learn about my experience, projects, and get in touch.',
+  title: 'Nicole Huang | Engineer & Program Lead',
+  description: "Part engineer, part program lead, full-time explorer. 9+ years building tech and leading programs. Chat with Proxie to learn more about Nicole's work.",
   icons: {
     icon: [
       {
@@ -55,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${lora.variable} ${inter.variable} ${playfairDisplay.variable}`}>
+    <html lang="en" className={`${dmSans.variable} ${lora.variable}`}>
       <body className="font-sans antialiased">
         {children}
         <Analytics />
