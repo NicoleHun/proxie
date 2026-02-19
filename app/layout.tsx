@@ -14,8 +14,8 @@ const lora = Lora({
 })
 
 export const metadata: Metadata = {
-  title: 'Nicole Huang | Engineer & Program Lead',
-  description: "Part engineer, part program lead, full-time explorer. 9+ years building tech and leading programs. Chat with Proxie to learn more about Nicole's work.",
+  title: 'Nicole Huang | Technical Program & Product Manager',
+  description: "Technical Program & Product Manager, full-time explorer. 9+ years building tech and leading programs. Chat with Proxie to learn more about Nicole's work.",
   icons: {
     icon: [
       {
