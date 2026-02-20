@@ -1,3 +1,43 @@
+// ── OPTION 2: Hardcoded routing index ────────────────────────────────────────
+// Mirrors what 00-routing-index.gdoc tells Claude, so we can skip that fetch.
+// Keys = doc names in Google Drive. Values = keywords that should trigger it.
+// Update this whenever you add/rename docs in proxie-kb.
+export const ROUTING_INDEX: Record<string, string[]> = {
+    'work-history': [
+        'work', 'job', 'experience', 'career', 'background', 'resume', 'cv',
+        'history', 'role', 'position', 'title', 'company', 'employer',
+        'where', 'when', 'years', 'industry', 'sector',
+    ],
+    'problem-solving-stories': [
+        'problem', 'challenge', 'difficult', 'hard', 'tough', 'obstacle',
+        'solve', 'solution', 'story', 'example', 'situation', 'crisis',
+        'conflict', 'failure', 'mistake', 'learn', 'lesson',
+    ],
+    'skills': [
+        'skill', 'technical', 'tool', 'technology', 'stack', 'language',
+        'framework', 'software', 'program', 'code', 'coding', 'engineer',
+        'product', 'pm', 'tpm', 'program manager', 'certif', 'proficien',
+    ],
+    'leadership': [
+        'lead', 'leadership', 'manage', 'manag', 'team', 'people', 'direct',
+        'report', 'mentor', 'coach', 'cross-functional', 'stakeholder',
+        'executive', 'strategy', 'vision', 'influence', 'without authority',
+    ],
+    'achievements': [
+        'achiev', 'accomplish', 'win', 'award', 'proud', 'impact', 'result',
+        'outcome', 'success', 'ship', 'launch', 'deliver', 'metric', 'kpi',
+        'revenue', 'growth', 'improvement', 'saved', 'reduced',
+    ],
+    'education': [
+        'educat', 'school', 'university', 'college', 'degree', 'study',
+        'studied', 'major', 'graduate', 'undergrad', 'gpa', 'course',
+    ],
+    'personal': [
+        'hobby', 'hobbies', 'personal', 'outside', 'fun', 'life',
+        'interest', 'passion', 'enjoy', 'free time', 'weekend',
+    ],
+};
+
 export const PERSONAL_INFO = {
 	name: "Nicole",
 	fullName: "Nicole Huang",

@@ -1,12 +1,543 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import sql, { initDb } from '@/lib/db';
-import { PROXIE_SYSTEM_PROMPT } from '@/lib/constants';
+import { PROXIE_SYSTEM_PROMPT, ROUTING_INDEX } from '@/lib/constants';
 import { KB_TOOLS, fetchDocByName, listDocs } from '@/lib/kb';
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+// ── Model constants ───────────────────────────────────────────────────────────
+// Option 3: Haiku for fast tool-call decisions, Sonnet for quality final answer
+const ROUTING_MODEL = 'claude-haiku-4-5-20251001';
+const RESPONSE_MODEL = 'claude-sonnet-4-6';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function buildContext(message: string, session_id: string) {
+    await initDb();
+
+    let session = await sql`SELECT round_count, conversation_history FROM sessions WHERE id = ${session_id}`;
+    let roundCount = 0;
+    let history: any[] = [];
+
+    if (session.length === 0) {
+        await sql`INSERT INTO sessions (id, round_count, conversation_history) VALUES (${session_id}, 0, ${JSON.stringify([])})`;
+    } else {
+        roundCount = session[0].round_count;
+        history = session[0].conversation_history;
+    }
+
+    const shouldSendCTA = roundCount === 5 || roundCount === 8 || roundCount === 10 || roundCount >= 11;
+    const CTA_NOTE = "\n\n(Note: It's a good moment to naturally surface a CTA. Encourage the user to connect with Nicole directly — suggest scheduling a 20-minute meeting at https://calendly.com/nicolechat/new-meeting. Be warm and non-pushy. Surface it once naturally.)";
+    const userContent = shouldSendCTA ? `${message}${CTA_NOTE}` : message;
+
+    const userMessage = { role: 'user' as const, content: userContent };
+    const cleanHistory = history.filter((m: any) => m.content && m.content.trim() !== '');
+    const messages: any[] = [...cleanHistory, userMessage];
+
+    const systemBlock = {
+        type: 'text' as const,
+        text: PROXIE_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' as const },
+    };
+
+    return { messages, systemBlock, cleanHistory, userMessage, roundCount };
+}
+
+async function saveToDb(
+    session_id: string,
+    cleanHistory: any[],
+    userMessage: any,
+    assistantReply: string,
+    roundCount: number
+) {
+    const savedHistory = [...cleanHistory, userMessage, { role: 'assistant', content: assistantReply }];
+    const newRoundCount = roundCount + 1;
+    await sql`
+        UPDATE sessions
+        SET round_count = ${newRoundCount}, conversation_history = ${JSON.stringify(savedHistory)}
+        WHERE id = ${session_id}
+    `;
+    return newRoundCount;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OPTION 2: Keyword-based routing — resolves docs without a Claude call
+// ─────────────────────────────────────────────────────────────────────────────
+
+function resolveDocsLocally(message: string): string[] {
+    const lower = message.toLowerCase();
+    const matched: string[] = [];
+
+    for (const [docName, keywords] of Object.entries(ROUTING_INDEX)) {
+        if (keywords.some(kw => lower.includes(kw))) {
+            matched.push(docName);
+        }
+    }
+
+    // Default fallback
+    if (matched.length === 0) {
+        matched.push('work-history');
+    }
+
+    return matched.slice(0, 2); // cap at 2 docs
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OPTION 1: Streaming response via Server-Sent Events
+//
+// How it works:
+//   1. Run the agentic tool loop (non-streaming) so docs are fetched first
+//   2. Stream the final Claude response token-by-token to the frontend
+//   3. Frontend reads the SSE stream and appends tokens in real time
+//
+// The user sees the first words in ~2s instead of waiting the full 13s.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleStreaming(message: string, session_id: string): Promise<Response> {
+    const ctx = await buildContext(message, session_id);
+    const { messages, systemBlock, cleanHistory, userMessage, roundCount } = ctx;
+
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+        async start(controller) {
+            function send(event: string, data: string) {
+                controller.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
+            }
+
+            try {
+                // Phase 1: agentic tool loop (non-streaming) — lets Claude fetch docs
+                send('status', JSON.stringify({ phase: 'thinking' }));
+
+                let toolResponse = await anthropic.messages.create({
+                    model: RESPONSE_MODEL,
+                    max_tokens: 300,
+                    system: [systemBlock],
+                    tools: KB_TOOLS as any,
+                    messages,
+                });
+
+                while (toolResponse.stop_reason === 'tool_use') {
+                    const assistantContent = toolResponse.content;
+                    const toolUseBlocks = assistantContent.filter((b: any) => b.type === 'tool_use');
+
+                    console.log('[stream] tool calls:', toolUseBlocks.map((b: any) => `${b.name}(${JSON.stringify(b.input)})`));
+                    send('status', JSON.stringify({ phase: 'fetching' }));
+
+                    const toolResults = await Promise.all(
+                        toolUseBlocks.map(async (block: any) => {
+                            let result: string;
+                            try {
+                                if (block.name === 'fetch_kb_doc') {
+                                    result = await fetchDocByName(block.input.doc_name);
+                                } else if (block.name === 'list_kb_docs') {
+                                    result = await listDocs();
+                                } else {
+                                    result = `Unknown tool: ${block.name}`;
+                                }
+                            } catch (err: any) {
+                                result = `Error executing ${block.name}: ${err.message}`;
+                            }
+                            return {
+                                type: 'tool_result' as const,
+                                tool_use_id: block.id,
+                                content: result,
+                            };
+                        })
+                    );
+
+                    messages.push({ role: 'assistant', content: assistantContent });
+                    messages.push({ role: 'user', content: toolResults });
+
+                    toolResponse = await anthropic.messages.create({
+                        model: RESPONSE_MODEL,
+                        max_tokens: 180,
+                        system: [systemBlock],
+                        tools: KB_TOOLS as any,
+                        messages,
+                    });
+                }
+
+                // Phase 2: stream the final reply token by token
+                send('status', JSON.stringify({ phase: 'responding' }));
+
+                // If Claude already has a text reply from the tool loop, stream it
+                const existingText = toolResponse.content
+                    .filter((b: any) => b.type === 'text')
+                    .map((b: any) => b.text)
+                    .join('');
+
+                let fullText = '';
+
+                if (existingText) {
+                    // We have the full text already — forward it in chunks so the UI
+                    // can render progressively without an extra round-trip
+                    fullText = existingText;
+                    // Split into ~word-sized chunks and emit them
+                    const chunks = existingText.match(/\S+\s*/g) ?? [existingText];
+                    for (const chunk of chunks) {
+                        send('token', JSON.stringify({ text: chunk }));
+                        // yield to event loop so Next.js flushes the chunk
+                        await new Promise(r => setTimeout(r, 0));
+                    }
+                } else {
+                    // No text yet — make a fresh streaming call
+                    const streamResp = anthropic.messages.stream({
+                        model: RESPONSE_MODEL,
+                        max_tokens: 300,
+                        system: [systemBlock],
+                        messages,
+                    });
+
+                    for await (const chunk of streamResp) {
+                        if (
+                            chunk.type === 'content_block_delta' &&
+                            chunk.delta?.type === 'text_delta'
+                        ) {
+                            const text = (chunk.delta as any).text as string;
+                            fullText += text;
+                            send('token', JSON.stringify({ text }));
+                        }
+                    }
+                }
+
+                if (fullText) {
+                    const newRoundCount = await saveToDb(session_id, cleanHistory, userMessage, fullText, roundCount);
+                    send('done', JSON.stringify({ session_id, round_count: newRoundCount }));
+                } else {
+                    send('error', JSON.stringify({ message: 'Empty response from Claude' }));
+                }
+            } catch (err: any) {
+                console.error('[stream] error:', err.message);
+                send('error', JSON.stringify({ message: err.message }));
+            } finally {
+                controller.close();
+            }
+        },
+    });
+
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        },
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OPTION 2: Hardcoded routing — skip the 00-routing-index Claude call
+//
+// How it works:
+//   1. Use ROUTING_INDEX keyword map to pick docs locally (0ms, no API call)
+//   2. Fetch those docs from Google Drive in parallel
+//   3. Inject docs as context into a single Sonnet call for the final answer
+//
+// Saves ~2-3s by eliminating the first Claude round-trip entirely.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleHardcodedRouting(message: string, session_id: string): Promise<Response> {
+    const ctx = await buildContext(message, session_id);
+    const { messages, systemBlock, cleanHistory, userMessage, roundCount } = ctx;
+
+    // Resolve docs locally — no Claude call needed
+    const docsToFetch = resolveDocsLocally(message);
+    console.log('[routing] hardcoded resolved:', docsToFetch);
+
+    // Fetch docs in parallel
+    const docContents = await Promise.all(
+        docsToFetch.map(async (docName) => ({
+            docName,
+            content: await fetchDocByName(docName),
+        }))
+    );
+
+    // Inject docs as a system-like context message
+    const docsContext = docContents
+        .map(({ docName, content }) => `[${docName}]\n${content}`)
+        .join('\n\n---\n\n');
+
+    const messagesWithDocs = [
+        ...messages,
+        {
+            role: 'user' as const,
+            content: `Here are the relevant knowledge base documents:\n\n${docsContext}\n\nNow answer the user's question using only this content.`,
+        },
+    ];
+
+    // Single Sonnet call — no tool loop
+    const response = await anthropic.messages.create({
+        model: RESPONSE_MODEL,
+        max_tokens: 300,
+        system: [systemBlock],
+        messages: messagesWithDocs,
+    });
+
+    const u = response.usage as any;
+    console.log('[routing] usage:', {
+        cache_read: u.cache_read_input_tokens ?? 0,
+        input: u.input_tokens,
+        output: u.output_tokens,
+    });
+
+    const assistantReply = response.content
+        .filter((b: any) => b.type === 'text')
+        .map((b: any) => b.text)
+        .join('');
+
+    if (!assistantReply) {
+        return NextResponse.json({
+            reply: "I'm having trouble right now. Please try again.",
+            session_id,
+            round_count: roundCount,
+        });
+    }
+
+    const newRoundCount = await saveToDb(session_id, cleanHistory, userMessage, assistantReply, roundCount);
+    return NextResponse.json({ reply: assistantReply, session_id, round_count: newRoundCount });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OPTION 3: Two-model — Haiku for tool calls, Sonnet for final answer
+//
+// How it works:
+//   1. Haiku runs the full tool-use loop (fetch routing-index + docs)
+//      Haiku is ~5x faster for simple decisions, so this saves 1-2s
+//   2. The doc context Haiku gathered is passed to Sonnet
+//   3. Sonnet writes the final polished response
+//
+// Saves 1-2s on routing/fetching, preserves Sonnet quality on the reply.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleTwoModel(message: string, session_id: string): Promise<Response> {
+    const ctx = await buildContext(message, session_id);
+    const { messages, systemBlock, cleanHistory, userMessage, roundCount } = ctx;
+
+    // Phase 1: Haiku drives the tool-use loop (fast + cheap)
+    let haikusResponse = await anthropic.messages.create({
+        model: ROUTING_MODEL,
+        max_tokens: 150, // Haiku only emits tool calls here, not prose
+        system: [systemBlock],
+        tools: KB_TOOLS as any,
+        messages,
+    });
+
+    console.log('[two-model] haiku initial stop_reason:', haikusResponse.stop_reason);
+
+    while (haikusResponse.stop_reason === 'tool_use') {
+        const assistantContent = haikusResponse.content;
+        const toolUseBlocks = assistantContent.filter((b: any) => b.type === 'tool_use');
+
+        console.log('[two-model] haiku tool calls:', toolUseBlocks.map((b: any) => `${b.name}(${JSON.stringify(b.input)})`));
+
+        const toolResults = await Promise.all(
+            toolUseBlocks.map(async (block: any) => {
+                let result: string;
+                try {
+                    if (block.name === 'fetch_kb_doc') {
+                        result = await fetchDocByName(block.input.doc_name);
+                    } else if (block.name === 'list_kb_docs') {
+                        result = await listDocs();
+                    } else {
+                        result = `Unknown tool: ${block.name}`;
+                    }
+                } catch (err: any) {
+                    result = `Error executing ${block.name}: ${err.message}`;
+                }
+                return {
+                    type: 'tool_result' as const,
+                    tool_use_id: block.id,
+                    content: result,
+                };
+            })
+        );
+
+        messages.push({ role: 'assistant', content: assistantContent });
+        messages.push({ role: 'user', content: toolResults });
+
+        haikusResponse = await anthropic.messages.create({
+            model: ROUTING_MODEL,
+            max_tokens: 150,
+            system: [systemBlock],
+            tools: KB_TOOLS as any,
+            messages,
+        });
+
+        console.log('[two-model] haiku follow-up stop_reason:', haikusResponse.stop_reason);
+    }
+
+    // Phase 2: Sonnet writes the final reply with the full doc context Haiku fetched
+    const finalResponse = await anthropic.messages.create({
+        model: RESPONSE_MODEL,
+        max_tokens: 300,
+        system: [systemBlock],
+        tools: [], // No tools — Haiku already fetched everything
+        messages,  // Contains routing-index + doc content from Haiku's tool calls
+    });
+
+    const u = finalResponse.usage as any;
+    console.log('[two-model] sonnet usage:', {
+        cache_read: u.cache_read_input_tokens ?? 0,
+        input: u.input_tokens,
+        output: u.output_tokens,
+    });
+
+    const assistantReply = finalResponse.content
+        .filter((b: any) => b.type === 'text')
+        .map((b: any) => b.text)
+        .join('');
+
+    if (!assistantReply) {
+        return NextResponse.json({
+            reply: "I'm having trouble right now. Please try again.",
+            session_id,
+            round_count: roundCount,
+        });
+    }
+
+    const newRoundCount = await saveToDb(session_id, cleanHistory, userMessage, assistantReply, roundCount);
+    return NextResponse.json({ reply: assistantReply, session_id, round_count: newRoundCount });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Original implementation — unchanged baseline
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleOriginal(message: string, session_id: string): Promise<Response> {
+    await initDb();
+
+    let session = await sql`SELECT round_count, conversation_history FROM sessions WHERE id = ${session_id}`;
+    let roundCount = 0;
+    let history: any[] = [];
+
+    if (session.length === 0) {
+        await sql`INSERT INTO sessions (id, round_count, conversation_history) VALUES (${session_id}, 0, ${JSON.stringify([])})`;
+    } else {
+        roundCount = session[0].round_count;
+        history = session[0].conversation_history;
+    }
+
+    const systemPrompt = PROXIE_SYSTEM_PROMPT;
+    const shouldSendCTA = roundCount === 5 || roundCount === 8 || roundCount === 10 || roundCount >= 11;
+    const CTA_NOTE = "\n\n(Note: It's a good moment to naturally surface a CTA. Encourage the user to connect with Nicole directly — suggest scheduling a 20-minute meeting at https://calendly.com/nicolechat/new-meeting. Be warm and non-pushy. Surface it once naturally.)";
+    const userContent = shouldSendCTA ? `${message}${CTA_NOTE}` : message;
+    const userMessage = { role: 'user' as const, content: userContent };
+    const cleanHistory = history.filter((m: any) => m.content && m.content.trim() !== '');
+    const messages: any[] = [...cleanHistory, userMessage];
+
+    console.log('[chat] model: claude-sonnet-4-6 | history:', messages.length, '| system:', systemPrompt.length, 'chars');
+
+    const systemBlock = {
+        type: 'text' as const,
+        text: systemPrompt,
+        cache_control: { type: 'ephemeral' as const },
+    };
+    console.log('[cache-debug]', JSON.stringify(systemBlock.cache_control));
+
+    let response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 300,
+        system: [systemBlock],
+        tools: KB_TOOLS as any,
+        messages,
+    });
+
+    const u1 = response.usage as any;
+    console.log('[cache] initial:', {
+        cache_created: u1.cache_creation_input_tokens ?? u1.cache_creation?.ephemeral_5m_input_tokens ?? 0,
+        cache_read: u1.cache_read_input_tokens ?? 0,
+        input: u1.input_tokens,
+        output: u1.output_tokens,
+    });
+    console.log('[chat] initial stop_reason:', response.stop_reason);
+
+    while (response.stop_reason === 'tool_use') {
+        const assistantContent = response.content;
+        const toolUseBlocks = assistantContent.filter((b: any) => b.type === 'tool_use');
+
+        console.log('[chat] tool calls:', toolUseBlocks.map((b: any) => `${b.name}(${JSON.stringify(b.input)})`));
+
+        const toolResults = await Promise.all(
+            toolUseBlocks.map(async (block: any) => {
+                let result: string;
+                try {
+                    if (block.name === 'fetch_kb_doc') {
+                        result = await fetchDocByName(block.input.doc_name);
+                    } else if (block.name === 'list_kb_docs') {
+                        result = await listDocs();
+                    } else {
+                        result = `Unknown tool: ${block.name}`;
+                    }
+                } catch (err: any) {
+                    console.error('[chat] tool error:', block.name, err.message);
+                    result = `Error executing ${block.name}: ${err.message}`;
+                }
+                console.log('[chat] tool result for', block.name, ':', result.slice(0, 100) + '...');
+                return {
+                    type: 'tool_result' as const,
+                    tool_use_id: block.id,
+                    content: result,
+                };
+            })
+        );
+
+        messages.push({ role: 'assistant', content: assistantContent });
+        messages.push({ role: 'user', content: toolResults });
+
+        response = await anthropic.messages.create({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 180,
+            system: [systemBlock],
+            tools: KB_TOOLS as any,
+            messages,
+        });
+
+        const u2 = response.usage as any;
+        console.log('[cache] follow-up:', {
+            cache_created: u2.cache_creation_input_tokens ?? u2.cache_creation?.ephemeral_5m_input_tokens ?? 0,
+            cache_read: u2.cache_read_input_tokens ?? 0,
+            input: u2.input_tokens,
+            output: u2.output_tokens,
+        });
+        console.log('[chat] follow-up stop_reason:', response.stop_reason);
+    }
+
+    const assistantReply = response.content
+        .filter((b: any) => b.type === 'text')
+        .map((b: any) => b.text)
+        .join('');
+
+    console.log('[chat] final reply length:', assistantReply.length);
+
+    if (!assistantReply) {
+        console.error('[chat] WARNING: empty reply — not saving to history');
+        return NextResponse.json({ reply: "I'm having trouble accessing the knowledge base right now. Please try again.", session_id, round_count: roundCount });
+    }
+
+    const savedHistory = [...cleanHistory, userMessage, { role: 'assistant', content: assistantReply }];
+    const newRoundCount = roundCount + 1;
+
+    await sql`
+        UPDATE sessions SET round_count = ${newRoundCount}, conversation_history = ${JSON.stringify(savedHistory)} WHERE id = ${session_id}
+    `;
+
+    return NextResponse.json({ reply: assistantReply, session_id, round_count: newRoundCount });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main POST handler
+//
+// Select mode via query param or LATENCY_MODE env var:
+//   ?mode=stream    → Option 1: SSE streaming (biggest perceived speedup)
+//   ?mode=routing   → Option 2: hardcoded routing (saves ~2-3s real time)
+//   ?mode=twomodel  → Option 3: Haiku tool calls + Sonnet answer (saves ~1-2s)
+//   (default)       → original behavior (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
     try {
@@ -20,139 +551,22 @@ export async function POST(req: NextRequest) {
             session_id = crypto.randomUUID();
         }
 
-        await initDb();
+        const mode = req.nextUrl.searchParams.get('mode')
+            ?? process.env.LATENCY_MODE
+            ?? 'original';
 
-        // 1. Fetch existing session or create a new one
-        let session = await sql`SELECT round_count, conversation_history FROM sessions WHERE id = ${session_id}`;
+        console.log('[chat] mode:', mode, '| message length:', message.length);
 
-        let roundCount = 0;
-        let history: any[] = [];
-
-        if (session.length === 0) {
-            await sql`INSERT INTO sessions (id, round_count, conversation_history) VALUES (${session_id}, 0, ${JSON.stringify([])})`;
-        } else {
-            roundCount = session[0].round_count;
-            history = session[0].conversation_history;
+        switch (mode) {
+            case 'stream':
+                return handleStreaming(message, session_id);
+            case 'routing':
+                return handleHardcodedRouting(message, session_id);
+            case 'twomodel':
+                return handleTwoModel(message, session_id);
+            default:
+                return handleOriginal(message, session_id);
         }
-
-        // 2. System prompt is immutable — never mutated, always cache-hits after first request
-        const systemPrompt = PROXIE_SYSTEM_PROMPT;
-
-        // 3. Build message history — filter out empty assistant turns from previous failures
-        const shouldSendCTA = roundCount === 5 || roundCount === 8 || roundCount === 10 || roundCount >= 11;
-        const CTA_NOTE = "\n\n(Note: It's a good moment to naturally surface a CTA. Encourage the user to connect with Nicole directly — suggest scheduling a 20-minute meeting at https://calendly.com/nicolechat/new-meeting. Be warm and non-pushy. Surface it once naturally.)";
-
-        const userContent = shouldSendCTA ? `${message}${CTA_NOTE}` : message;
-        const userMessage = { role: 'user' as const, content: userContent };
-        const cleanHistory = history.filter((m: any) => m.content && m.content.trim() !== '')
-        const messages: any[] = [...cleanHistory, userMessage];
-
-        console.log('[chat] model: claude-sonnet-4-6 | history:', messages.length, '| system:', systemPrompt.length, 'chars');
-
-        // 4. Agentic tool loop — follows MCP guide pattern
-        //    Claude calls fetch_kb_doc / list_kb_docs, we execute them, feed results back
-        const systemBlock = {
-            type: 'text' as const,
-            text: systemPrompt,
-            cache_control: { type: 'ephemeral' as const },
-        };
-        console.log('[cache-debug]', JSON.stringify(systemBlock.cache_control));
-
-        let response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 300,
-            system: [systemBlock],
-            tools: KB_TOOLS as any,
-            messages,
-        });
-
-
-        const u1 = response.usage as any;
-        console.log('[cache] initial:', {
-            cache_created: u1.cache_creation_input_tokens ?? u1.cache_creation?.ephemeral_5m_input_tokens ?? 0,
-            cache_read: u1.cache_read_input_tokens ?? 0,
-            input: u1.input_tokens,
-            output: u1.output_tokens,
-        });
-        console.log('[chat] initial stop_reason:', response.stop_reason);
-
-        // Loop while Claude wants to use tools
-        while (response.stop_reason === 'tool_use') {
-            const assistantContent = response.content;
-            const toolUseBlocks = assistantContent.filter((b: any) => b.type === 'tool_use');
-
-            console.log('[chat] tool calls:', toolUseBlocks.map((b: any) => `${b.name}(${JSON.stringify(b.input)})`));
-
-            // Execute each tool call
-            const toolResults = await Promise.all(
-                toolUseBlocks.map(async (block: any) => {
-                    let result: string;
-                    try {
-                        if (block.name === 'fetch_kb_doc') {
-                            result = await fetchDocByName(block.input.doc_name);
-                        } else if (block.name === 'list_kb_docs') {
-                            result = await listDocs();
-                        } else {
-                            result = `Unknown tool: ${block.name}`;
-                        }
-                    } catch (err: any) {
-                        console.error('[chat] tool error:', block.name, err.message);
-                        result = `Error executing ${block.name}: ${err.message}`;
-                    }
-                    console.log('[chat] tool result for', block.name, ':', result.slice(0, 100) + '...');
-                    return {
-                        type: 'tool_result' as const,
-                        tool_use_id: block.id,
-                        content: result,
-                    };
-                })
-            );
-
-            // Append assistant turn + tool results, then call Claude again
-            messages.push({ role: 'assistant', content: assistantContent });
-            messages.push({ role: 'user', content: toolResults });
-
-            response = await anthropic.messages.create({
-                model: 'claude-sonnet-4-6',
-                max_tokens: 180,
-                system: [systemBlock],
-                tools: KB_TOOLS as any,
-                messages,
-            });
-
-            const u2 = response.usage as any;
-            console.log('[cache] follow-up:', {
-                cache_created: u2.cache_creation_input_tokens ?? u2.cache_creation?.ephemeral_5m_input_tokens ?? 0,
-                cache_read: u2.cache_read_input_tokens ?? 0,
-                input: u2.input_tokens,
-                output: u2.output_tokens,
-            });
-            console.log('[chat] follow-up stop_reason:', response.stop_reason);
-        }
-
-        // Extract final text reply
-        const assistantReply = response.content
-            .filter((b: any) => b.type === 'text')
-            .map((b: any) => b.text)
-            .join('');
-
-        console.log('[chat] final reply length:', assistantReply.length);
-
-        if (!assistantReply) {
-            console.error('[chat] WARNING: empty reply — not saving to history');
-            return NextResponse.json({ reply: "I'm having trouble accessing the knowledge base right now. Please try again.", session_id, round_count: roundCount });
-        }
-
-        // 5. Save to DB (only the user + final assistant turns — not the intermediate tool messages)
-        const savedHistory = [...cleanHistory, userMessage, { role: 'assistant', content: assistantReply }];
-        const newRoundCount = roundCount + 1;
-
-        await sql`
-            UPDATE sessions SET round_count = ${newRoundCount}, conversation_history = ${JSON.stringify(savedHistory)} WHERE id = ${session_id}
-        `;
-
-        return NextResponse.json({ reply: assistantReply, session_id, round_count: newRoundCount });
-
     } catch (error: any) {
         console.error('[chat] Error status:', error?.status);
         console.error('[chat] Error body:', JSON.stringify(error?.error ?? error?.message));
