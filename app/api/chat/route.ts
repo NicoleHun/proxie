@@ -64,22 +64,12 @@ export async function POST(req: NextRequest) {
         console.log('[chat] history length:', updatedHistory.length)
         console.log('[chat] system prompt length:', systemPrompt.length)
 
-        // 4. Call Anthropic API — MCP only (prompt-caching removed to isolate 500)
-        const response = await (anthropic.messages.create as any)({
+        // 4. Call Anthropic API — stripped to minimum to isolate 500
+        const response = await anthropic.messages.create({
             model: "claude-sonnet-4-6",
             max_tokens: 500,
-            temperature: 0.7,
             system: systemPrompt,
             messages: updatedHistory,
-            mcp_servers: [
-                {
-                    type: 'url',
-                    url: mcpUrl,
-                    name: 'proxie-kb'
-                }
-            ]
-        }, {
-            headers: { "anthropic-beta": betaHeader }
         });
         console.log('[chat] anthropic responded | stop_reason:', response.stop_reason)
         console.log('[chat] content blocks:', JSON.stringify(response.content?.map((b: any) => ({ type: b.type, len: b.text?.length }))))
