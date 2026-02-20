@@ -36,11 +36,14 @@ export async function POST(req: NextRequest) {
 
         // 2. Prepare System Prompt
         let systemPrompt = PROXIE_SYSTEM_PROMPT;
-        const CTA_PROMPT = "\n\n(Note: This is round 4 or later. Please encourage the user to connect with Nicole on LinkedIn or reach out via email for a deeper conversation!)";
+        const CTA_PROMPT = "\n\n(Note: It's a good moment to naturally surface a CTA. Encourage the user to connect with Nicole directly — suggest scheduling a 20-minute call at https://calendly.com/nicolechat/new-meeting. Be warm and non-pushy. Surface it once naturally.)";
 
-        if (roundCount >= 4) {
+        const shouldSendCTA = roundCount === 5 || roundCount === 8 || roundCount === 10 || roundCount >= 11;
+
+        if (shouldSendCTA) {
             systemPrompt += CTA_PROMPT;
         }
+
 
         // 3. Update history with user message
         const userMessage = { role: 'user', content: message };
