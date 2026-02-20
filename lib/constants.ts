@@ -14,10 +14,11 @@ export const ROUTING_INDEX: Record<string, string[]> = {
         'solve', 'solution', 'story', 'example', 'situation', 'crisis',
         'conflict', 'failure', 'mistake', 'learn', 'lesson',
     ],
-    '03-skills': [
+    '03-drive-narrative': [
         'skill', 'technical', 'tool', 'technology', 'stack', 'language',
         'framework', 'software', 'program', 'code', 'coding', 'engineer',
         'product', 'pm', 'tpm', 'program manager', 'certif', 'proficien',
+        'drive', 'narrative', 'motivation', 'why', 'passion', 'story', 'about',
     ],
     '04-leadership': [
         'lead', 'leadership', 'manage', 'manag', 'team', 'people', 'direct',
