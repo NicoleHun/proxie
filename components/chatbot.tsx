@@ -17,10 +17,9 @@ type Message = {
 
 // ── Set this to the mode you want to test ─────────────────────────────────────
 // "stream"   → Option 1: tokens appear as they're generated (perceived 10x faster)
-// "routing"  → Option 2: hardcoded routing index, no routing round-trip (saves 2-3s real)
-// "twomodel" → Option 3: Haiku for tool calls, Sonnet for final answer (saves 1-2s real)
+// "twomodel" → Option 2: Haiku for tool calls, Sonnet for final answer (saves 1-2s real)
 // "original" → baseline (unchanged behavior)
-const LATENCY_MODE = "stream"
+const LATENCY_MODE = "twomodel"
 
 export function Chatbot() {
   const [input, setInput] = useState("")
