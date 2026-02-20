@@ -51,21 +51,29 @@ export async function POST(req: NextRequest) {
 
         // 4. Agentic tool loop — follows MCP guide pattern
         //    Claude calls fetch_kb_doc / list_kb_docs, we execute them, feed results back
+        const systemBlock = {
+            type: 'text' as const,
+            text: systemPrompt,
+            cache_control: { type: 'ephemeral' as const },
+        };
+        console.log('[cache-debug]', JSON.stringify(systemBlock.cache_control));
+
         let response = await anthropic.messages.create({
             model: 'claude-sonnet-4-6',
             max_tokens: 300,
-            system: [
-                {
-                    type: 'text',
-                    text: systemPrompt,
-                    cache_control: { type: 'ephemeral' },
-                }
-            ],
+            system: [systemBlock],
             tools: KB_TOOLS as any,
             messages,
         });
 
-        console.log('[cache] initial:', response.usage);
+
+        const u1 = response.usage as any;
+        console.log('[cache] initial:', {
+            cache_created: u1.cache_creation_input_tokens ?? u1.cache_creation?.ephemeral_5m_input_tokens ?? 0,
+            cache_read: u1.cache_read_input_tokens ?? 0,
+            input: u1.input_tokens,
+            output: u1.output_tokens,
+        });
         console.log('[chat] initial stop_reason:', response.stop_reason);
 
         // Loop while Claude wants to use tools
@@ -106,19 +114,19 @@ export async function POST(req: NextRequest) {
 
             response = await anthropic.messages.create({
                 model: 'claude-sonnet-4-6',
-                max_tokens: 300,
-                system: [
-                    {
-                        type: 'text',
-                        text: systemPrompt,
-                        cache_control: { type: 'ephemeral' },
-                    }
-                ],
+                max_tokens: 180,
+                system: [systemBlock],
                 tools: KB_TOOLS as any,
                 messages,
             });
 
-            console.log('[cache] follow-up:', response.usage);
+            const u2 = response.usage as any;
+            console.log('[cache] follow-up:', {
+                cache_created: u2.cache_creation_input_tokens ?? u2.cache_creation?.ephemeral_5m_input_tokens ?? 0,
+                cache_read: u2.cache_read_input_tokens ?? 0,
+                input: u2.input_tokens,
+                output: u2.output_tokens,
+            });
             console.log('[chat] follow-up stop_reason:', response.stop_reason);
         }
 
