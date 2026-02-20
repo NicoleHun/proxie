@@ -158,6 +158,10 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
 
                 let fullText = '';
                 for await (const chunk of streamResp) {
+                    // Log every chunk type for debugging
+                    if (chunk.type !== 'content_block_delta') {
+                        console.log('[stream] sonnet chunk:', chunk.type, JSON.stringify((chunk as any).delta ?? '').slice(0, 100));
+                    }
                     if (
                         chunk.type === 'content_block_delta' &&
                         chunk.delta?.type === 'text_delta'
@@ -168,6 +172,10 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                     }
                 }
 
+                // Log final message details
+                const finalMsg = await streamResp.finalMessage();
+                console.log('[stream] sonnet stop_reason:', finalMsg.stop_reason);
+                console.log('[stream] sonnet content blocks:', finalMsg.content.map((b: any) => b.type).join(', '));
                 console.log('[stream] sonnet fullText length:', fullText.length);
 
                 if (fullText) {
