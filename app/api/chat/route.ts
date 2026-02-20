@@ -144,19 +144,42 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                 // Phase 2: Sonnet streams the final reply with full doc context from Haiku.
                 send('status', JSON.stringify({ phase: 'responding' }));
                 console.log('[stream] haiku done, handing off to sonnet for streaming reply');
-                console.log('[stream] sonnet messages count:', messages.length);
 
-                // The messages array contains tool_use + tool_result turns from Haiku.
-                // Sonnet must receive the same KB_TOOLS definitions so it can interpret
-                // those turns — but we set tool_choice: {type:'none'} to prevent it from
-                // making any new tool calls. It will go straight to generating a text reply.
+                // Flatten messages for Sonnet — strip all tool_use/tool_result turns and
+                // inject the fetched doc content as a single clean user context block.
+                // This way Sonnet sees no tool scaffolding at all: just the conversation
+                // history, the retrieved docs as context, and the user's question.
+                const docContents: string[] = [];
+                for (const msg of messages) {
+                    if (Array.isArray(msg.content)) {
+                        for (const block of msg.content) {
+                            if (block.type === 'tool_result' && block.content) {
+                                docContents.push(block.content);
+                            }
+                        }
+                    }
+                }
+
+                // Build a clean message list: prior conversation + doc context + user question
+                const sonnetMessages: any[] = [
+                    ...cleanHistory,
+                    ...(docContents.length > 0 ? [{
+                        role: 'user',
+                        content: `Here are the relevant documents retrieved for this question:\n\n${docContents.join('\n\n---\n\n')}`,
+                    }, {
+                        role: 'assistant',
+                        content: 'Thanks, I have the documents. What would you like to know?',
+                    }] : []),
+                    userMessage,
+                ];
+
+                console.log('[stream] sonnet messages count:', sonnetMessages.length, '| docs injected:', docContents.length);
+
                 const streamResp = anthropic.messages.stream({
                     model: RESPONSE_MODEL,
                     max_tokens: 300,
                     system: [systemBlock],
-                    tools: KB_TOOLS as any,
-                    tool_choice: { type: 'none' },
-                    messages,
+                    messages: sonnetMessages,
                 });
 
                 let fullText = '';
