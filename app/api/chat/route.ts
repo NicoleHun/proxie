@@ -69,7 +69,7 @@ async function saveToDb(
 // OPTION 1 + 2 combined: Haiku tool loop → Sonnet streaming reply
 //
 // How it works:
-//   1. Haiku runs the tool-use loop (routing-index + doc fetches) — fast & cheap
+//   1. Haiku runs the tool-use loop (direct doc fetches) — fast & cheap
 //   2. Sonnet streams the final answer token-by-token over SSE
 //   3. Frontend renders tokens as they arrive — user sees words at ~2s
 //
@@ -183,6 +183,126 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                 console.error('[stream] error:', err.message);
                 console.error('[stream] error status:', (err as any)?.status);
                 console.error('[stream] error body:', JSON.stringify((err as any)?.error ?? (err as any)?.message));
+                send('error', JSON.stringify({ message: err.message }));
+            } finally {
+                controller.close();
+            }
+        },
+    });
+
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        },
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sonnet-only streaming: single model handles tool loop + streams final reply
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleSonnetStream(message: string, session_id: string): Promise<Response> {
+    const ctx = await buildContext(message, session_id);
+    const { messages, systemBlock, cleanHistory, userMessage, roundCount } = ctx;
+
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+        async start(controller) {
+            function send(event: string, data: string) {
+                controller.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
+            }
+
+            try {
+                // Phase 1: Sonnet drives the tool-use loop (doc fetches)
+                send('status', JSON.stringify({ phase: 'thinking' }));
+
+                let response = await anthropic.messages.create({
+                    model: RESPONSE_MODEL,
+                    max_tokens: 150,
+                    system: [systemBlock],
+                    tools: KB_TOOLS as any,
+                    messages,
+                });
+
+                while (response.stop_reason === 'tool_use') {
+                    const assistantContent = response.content;
+                    const toolUseBlocks = assistantContent.filter((b: any) => b.type === 'tool_use');
+
+                    console.log('[sonnet-stream] tool calls:', toolUseBlocks.map((b: any) => `${b.name}(${JSON.stringify(b.input)})`));
+                    send('status', JSON.stringify({ phase: 'fetching' }));
+
+                    const toolResults = await Promise.all(
+                        toolUseBlocks.map(async (block: any) => {
+                            let result: string;
+                            try {
+                                if (block.name === 'fetch_kb_doc') {
+                                    result = await fetchDocByName(block.input.doc_name);
+                                } else if (block.name === 'list_kb_docs') {
+                                    result = await listDocs();
+                                } else {
+                                    result = `Unknown tool: ${block.name}`;
+                                }
+                            } catch (err: any) {
+                                result = `Error executing ${block.name}: ${err.message}`;
+                            }
+                            return {
+                                type: 'tool_result' as const,
+                                tool_use_id: block.id,
+                                content: result,
+                            };
+                        })
+                    );
+
+                    messages.push({ role: 'assistant', content: assistantContent });
+                    messages.push({ role: 'user', content: toolResults });
+
+                    response = await anthropic.messages.create({
+                        model: RESPONSE_MODEL,
+                        max_tokens: 150,
+                        system: [systemBlock],
+                        tools: KB_TOOLS as any,
+                        messages,
+                    });
+                }
+
+                // Phase 2: Sonnet streams the final reply
+                send('status', JSON.stringify({ phase: 'responding' }));
+                console.log('[sonnet-stream] tool loop done, streaming reply | messages:', messages.length);
+
+                const streamResp = anthropic.messages.stream({
+                    model: RESPONSE_MODEL,
+                    max_tokens: 300,
+                    system: [systemBlock],
+                    tools: KB_TOOLS as any,
+                    tool_choice: { type: 'none' },
+                    messages,
+                });
+
+                let fullText = '';
+                for await (const chunk of streamResp) {
+                    if (
+                        chunk.type === 'content_block_delta' &&
+                        chunk.delta?.type === 'text_delta'
+                    ) {
+                        const text = (chunk.delta as any).text as string;
+                        fullText += text;
+                        send('token', JSON.stringify({ text }));
+                    }
+                }
+
+                console.log('[sonnet-stream] reply length:', fullText.length);
+
+                if (fullText) {
+                    const newRoundCount = await saveToDb(session_id, cleanHistory, userMessage, fullText, roundCount);
+                    send('done', JSON.stringify({ session_id, round_count: newRoundCount }));
+                } else {
+                    send('error', JSON.stringify({ message: 'Empty response from Claude' }));
+                }
+            } catch (err: any) {
+                console.error('[sonnet-stream] error:', err.message);
                 send('error', JSON.stringify({ message: err.message }));
             } finally {
                 controller.close();
@@ -328,8 +448,9 @@ async function handleOriginal(message: string, session_id: string): Promise<Resp
 // Main POST handler
 //
 // Select mode via query param or LATENCY_MODE env var:
-//   ?mode=stream  → Haiku tool loop + Sonnet streaming reply (best of both)
-//   (default)     → original behavior (unchanged)
+//   ?mode=sonnet-stream → Sonnet tool loop + Sonnet streaming reply (single model)
+//   ?mode=stream        → Haiku tool loop + Sonnet streaming reply
+//   (default)           → original Sonnet-only, JSON response
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -351,6 +472,8 @@ export async function POST(req: NextRequest) {
         console.log('[chat] mode:', mode, '| message length:', message.length);
 
         switch (mode) {
+            case 'sonnet-stream':
+                return handleSonnetStream(message, session_id);
             case 'stream':
                 return handleStreaming(message, session_id);
             default:

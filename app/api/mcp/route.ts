@@ -101,13 +101,13 @@ async function listDocs(): Promise<string> {
 const MCP_TOOLS = [
     {
         name: 'fetch_kb_doc',
-        description: 'Fetch a specific document from the proxie-kb knowledge base by name. Always fetch 00-routing-index first to know which docs to retrieve next.',
+        description: 'Fetch a specific document from the proxie-kb knowledge base by name. Pick the most relevant doc(s) directly based on the question.',
         input_schema: {
             type: 'object',
             properties: {
                 doc_name: {
                     type: 'string',
-                    description: 'Name of the doc to fetch. Examples: "00-routing-index", "work-history", "problem-solving-stories", "gap-handling"'
+                    description: 'Name of the doc to fetch. Examples: "01-work-history", "03-drive-narrative", "07-gap-handling"'
                 }
             },
             required: ['doc_name']
