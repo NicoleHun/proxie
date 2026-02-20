@@ -144,12 +144,15 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                 // Phase 2: Sonnet streams the final reply with full doc context from Haiku
                 send('status', JSON.stringify({ phase: 'responding' }));
                 console.log('[stream] haiku done, handing off to sonnet for streaming reply');
+                console.log('[stream] messages count before sonnet:', messages.length);
 
+                // NOTE: do NOT pass tools: [] — when tool_result turns exist in messages,
+                // the API requires tool definitions to be present or omitted entirely.
+                // Passing an empty array with tool_result turns causes an API error.
                 const streamResp = anthropic.messages.stream({
                     model: RESPONSE_MODEL,
                     max_tokens: 300,
                     system: [systemBlock],
-                    tools: [],   // no tools — Haiku already fetched everything
                     messages,    // contains routing-index + doc content from Haiku's tool calls
                 });
 
@@ -165,6 +168,8 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                     }
                 }
 
+                console.log('[stream] sonnet fullText length:', fullText.length);
+
                 if (fullText) {
                     const newRoundCount = await saveToDb(session_id, cleanHistory, userMessage, fullText, roundCount);
                     send('done', JSON.stringify({ session_id, round_count: newRoundCount }));
@@ -173,6 +178,8 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                 }
             } catch (err: any) {
                 console.error('[stream] error:', err.message);
+                console.error('[stream] error status:', (err as any)?.status);
+                console.error('[stream] error body:', JSON.stringify((err as any)?.error ?? (err as any)?.message));
                 send('error', JSON.stringify({ message: err.message }));
             } finally {
                 controller.close();
