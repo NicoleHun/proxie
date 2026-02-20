@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import sql, { initDb } from '@/lib/db';
-import { PROXIE_SYSTEM_PROMPT, ROUTING_INDEX } from '@/lib/constants';
+import { PROXIE_SYSTEM_PROMPT } from '@/lib/constants';
 import { KB_TOOLS, fetchDocByName, listDocs } from '@/lib/kb';
 
 const anthropic = new Anthropic({
@@ -63,28 +63,6 @@ async function saveToDb(
         WHERE id = ${session_id}
     `;
     return newRoundCount;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OPTION 2: Keyword-based routing — resolves docs without a Claude call
-// ─────────────────────────────────────────────────────────────────────────────
-
-function resolveDocsLocally(message: string): string[] {
-    const lower = message.toLowerCase();
-    const matched: string[] = [];
-
-    for (const [docName, keywords] of Object.entries(ROUTING_INDEX)) {
-        if (keywords.some(kw => lower.includes(kw))) {
-            matched.push(docName);
-        }
-    }
-
-    // Default fallback — general questions get work history
-    if (matched.length === 0) {
-        matched.push('01-work-history');
-    }
-
-    return matched.slice(0, 2); // cap at 2 docs
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -228,78 +206,6 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
             'Connection': 'keep-alive',
         },
     });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OPTION 2: Hardcoded routing — skip the 00-routing-index Claude call
-//
-// How it works:
-//   1. Use ROUTING_INDEX keyword map to pick docs locally (0ms, no API call)
-//   2. Fetch those docs from Google Drive in parallel
-//   3. Inject docs as context into a single Sonnet call for the final answer
-//
-// Saves ~2-3s by eliminating the first Claude round-trip entirely.
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function handleHardcodedRouting(message: string, session_id: string): Promise<Response> {
-    const ctx = await buildContext(message, session_id);
-    const { messages, systemBlock, cleanHistory, userMessage, roundCount } = ctx;
-
-    // Resolve docs locally — no Claude call needed
-    const docsToFetch = resolveDocsLocally(message);
-    console.log('[routing] hardcoded resolved:', docsToFetch);
-
-    // Fetch docs in parallel
-    const docContents = await Promise.all(
-        docsToFetch.map(async (docName) => ({
-            docName,
-            content: await fetchDocByName(docName),
-        }))
-    );
-
-    // Inject docs as a system-like context message
-    const docsContext = docContents
-        .map(({ docName, content }) => `[${docName}]\n${content}`)
-        .join('\n\n---\n\n');
-
-    const messagesWithDocs = [
-        ...messages,
-        {
-            role: 'user' as const,
-            content: `Here are the relevant knowledge base documents:\n\n${docsContext}\n\nNow answer the user's question using only this content.`,
-        },
-    ];
-
-    // Single Sonnet call — no tool loop
-    const response = await anthropic.messages.create({
-        model: RESPONSE_MODEL,
-        max_tokens: 300,
-        system: [systemBlock],
-        messages: messagesWithDocs,
-    });
-
-    const u = response.usage as any;
-    console.log('[routing] usage:', {
-        cache_read: u.cache_read_input_tokens ?? 0,
-        input: u.input_tokens,
-        output: u.output_tokens,
-    });
-
-    const assistantReply = response.content
-        .filter((b: any) => b.type === 'text')
-        .map((b: any) => b.text)
-        .join('');
-
-    if (!assistantReply) {
-        return NextResponse.json({
-            reply: "I'm having trouble right now. Please try again.",
-            session_id,
-            round_count: roundCount,
-        });
-    }
-
-    const newRoundCount = await saveToDb(session_id, cleanHistory, userMessage, assistantReply, roundCount);
-    return NextResponse.json({ reply: assistantReply, session_id, round_count: newRoundCount });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -534,8 +440,7 @@ async function handleOriginal(message: string, session_id: string): Promise<Resp
 //
 // Select mode via query param or LATENCY_MODE env var:
 //   ?mode=stream    → Option 1: SSE streaming (biggest perceived speedup)
-//   ?mode=routing   → Option 2: hardcoded routing (saves ~2-3s real time)
-//   ?mode=twomodel  → Option 3: Haiku tool calls + Sonnet answer (saves ~1-2s)
+//   ?mode=twomodel  → Option 2: Haiku tool calls + Sonnet answer (saves ~1-2s)
 //   (default)       → original behavior (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -560,8 +465,6 @@ export async function POST(req: NextRequest) {
         switch (mode) {
             case 'stream':
                 return handleStreaming(message, session_id);
-            case 'routing':
-                return handleHardcodedRouting(message, session_id);
             case 'twomodel':
                 return handleTwoModel(message, session_id);
             default:
