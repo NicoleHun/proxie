@@ -4,39 +4,65 @@
 //   `name contains '...'` so the prefix e.g. "01-" is part of the match).
 // Update this whenever you add/rename docs in proxie-kb.
 export const ROUTING_INDEX: Record<string, string[]> = {
+    // Career history, roles, companies, timeline
     '01-work-history': [
         'work', 'job', 'experience', 'career', 'background', 'resume', 'cv',
         'history', 'role', 'position', 'title', 'company', 'employer',
-        'where', 'when', 'years', 'industry', 'sector',
+        'where', 'when', 'years', 'industry', 'sector', 'timeline',
+        'previous', 'current', 'past', 'worked',
     ],
+    // Hard problems, wins, failure stories
     '02-problem-solving-stories': [
         'problem', 'challenge', 'difficult', 'hard', 'tough', 'obstacle',
-        'solve', 'solution', 'story', 'example', 'situation', 'crisis',
+        'solve', 'solution', 'example', 'situation', 'crisis',
         'conflict', 'failure', 'mistake', 'learn', 'lesson',
+        'tell me about a time', 'walk me through', 'situation where',
     ],
+    // Drive, motivation, personal narrative, "why"
     '03-drive-narrative': [
-        'skill', 'technical', 'tool', 'technology', 'stack', 'language',
-        'framework', 'software', 'program', 'code', 'coding', 'engineer',
-        'product', 'pm', 'tpm', 'program manager', 'certif', 'proficien',
-        'drive', 'narrative', 'motivation', 'why', 'passion', 'story', 'about',
+        'drive', 'narrative', 'motivation', 'why', 'passion', 'about',
+        'story', 'origin', 'started', 'got into', 'interested in',
+        'what makes', 'care about', 'purpose', 'mission', 'values',
+        'strengths', 'superpower', 'unique', 'differentiator',
     ],
-    '04-leadership': [
-        'lead', 'leadership', 'manage', 'manag', 'team', 'people', 'direct',
-        'report', 'mentor', 'coach', 'cross-functional', 'stakeholder',
-        'executive', 'strategy', 'vision', 'influence', 'without authority',
+    // Side projects, personal builds, entrepreneurial work
+    '04-side-project': [
+        'side project', 'side-project', 'project', 'build', 'built',
+        'personal project', 'startup', 'launch', 'shipped', 'created',
+        'outside work', 'own time', 'entrepreneurial', 'proxie', 'portfolio',
     ],
-    '05-achievements': [
-        'achiev', 'accomplish', 'win', 'award', 'proud', 'impact', 'result',
-        'outcome', 'success', 'ship', 'launch', 'deliver', 'metric', 'kpi',
-        'revenue', 'growth', 'improvement', 'saved', 'reduced',
+    // Tech stack, tools, languages, platforms
+    '05-technical-stack': [
+        'technical', 'tech', 'stack', 'tool', 'technology', 'language',
+        'framework', 'software', 'code', 'coding', 'engineer', 'programming',
+        'python', 'javascript', 'typescript', 'sql', 'react', 'next',
+        'cloud', 'aws', 'gcp', 'azure', 'database', 'api', 'infra',
+        'skill', 'proficien', 'certif',
     ],
-    '06-education': [
-        'educat', 'school', 'university', 'college', 'degree', 'study',
-        'studied', 'major', 'graduate', 'undergrad', 'gpa', 'course',
+    // Recruiter-style questions: salary, availability, visa, format
+    '06-recruiter-screening': [
+        'recruiter', 'screening', 'hiring', 'salary', 'compensation', 'pay',
+        'availability', 'start', 'notice', 'visa', 'sponsorship', 'remote',
+        'hybrid', 'onsite', 'location', 'relocat', 'open to', 'looking for',
+        'job search', 'interview', 'offer', 'tc', 'total comp',
     ],
-    '07-personal': [
-        'hobby', 'hobbies', 'personal', 'outside', 'fun', 'life',
-        'interest', 'passion', 'enjoy', 'free time', 'weekend',
+    // Employment gaps, career pivots, non-linear path
+    '07-gap-handling': [
+        'gap', 'break', 'pause', 'leave', 'between jobs', 'unemployed',
+        'pivot', 'career change', 'transition', 'switch', 'non-linear',
+        'explain', 'what were you doing', 'time off',
+    ],
+    // Writing, thought leadership, published content
+    '08-blog-posts': [
+        'blog', 'post', 'writ', 'article', 'publish', 'thought leadership',
+        'content', 'essay', 'newsletter', 'opinion', 'perspective', 'medium',
+        'substack', 'linkedin post',
+    ],
+    // Hobbies, life outside work, personality
+    '09-interests-outside-work': [
+        'hobby', 'hobbies', 'outside work', 'personal', 'fun', 'life',
+        'interest', 'enjoy', 'free time', 'weekend', 'travel', 'sport',
+        'read', 'music', 'cook', 'human', 'beyond work', 'not work',
     ],
 };
 
