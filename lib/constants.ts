@@ -60,9 +60,11 @@ export const ROUTING_INDEX: Record<string, string[]> = {
     ],
     // Hobbies, life outside work, personality
     '09-interests-outside-work': [
-        'hobby', 'hobbies', 'outside work', 'personal', 'fun', 'life',
-        'interest', 'enjoy', 'free time', 'weekend', 'travel', 'sport',
+        'hobby', 'hobbies', 'interests', 'interest', 'outside work',
+        'outside of work', 'outside', 'personal', 'fun', 'life',
+        'enjoy', 'free time', 'weekend', 'travel', 'sport',
         'read', 'music', 'cook', 'human', 'beyond work', 'not work',
+        'like to do', 'do for fun', 'do outside', 'when not working',
     ],
 };
 
