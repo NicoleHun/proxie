@@ -24,33 +24,10 @@ export function Chatbot() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Initialize or retrieve session ID
-    let id = localStorage.getItem("proxie_session_id")
-    if (!id) {
-      id = crypto.randomUUID()
-      localStorage.setItem("proxie_session_id", id)
-    }
+    // Generate a fresh session ID on every page load
+    const id = crypto.randomUUID()
     setSessionId(id)
-
-    // Load existing messages if any
-    const fetchSession = async () => {
-      try {
-        const res = await fetch(`/api/session?session_id=${id}`)
-        if (res.ok) {
-          const data = await res.json()
-          if (data.conversation_history) {
-            setMessages(data.conversation_history.map((m: any, i: number) => ({
-              id: `msg-${i}`,
-              role: m.role,
-              content: m.content
-            })))
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch session:", err)
-      }
-    }
-    fetchSession()
+    // Start with empty messages array - backend will create new session automatically
   }, [])
 
   useEffect(() => {
@@ -175,7 +152,7 @@ export function Chatbot() {
                 </span>
                 <div 
                   className="max-w-[60%] rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
-                  style={{ width: 'fit-content' }}
+                  style={{ wordWrap: 'break-word', overflowWrap: 'break-word', width: 'fit-content' }}
                 >
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {PERSONAL_INFO.proxie.greeting}
@@ -252,7 +229,7 @@ export function Chatbot() {
                             ? "rounded-br-md bg-primary text-primary-foreground prose-headings:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground prose-a:text-primary-foreground"
                             : "rounded-bl-md bg-secondary text-secondary-foreground prose-headings:text-secondary-foreground prose-strong:text-secondary-foreground prose-code:text-secondary-foreground prose-a:text-secondary-foreground"
                         }`}
-                        style={{ width: 'fit-content' }}
+                        style={{ wordWrap: 'break-word', overflowWrap: 'break-word', width: 'fit-content' }}
                       >
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {message.content}
