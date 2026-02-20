@@ -6,6 +6,7 @@ import { PERSONAL_INFO } from "@/lib/constants"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import Image from "next/image"
+import { FeedbackDialog } from "@/components/feedback-dialog"
 
 type Rating = "up" | "down" | null
 
@@ -15,10 +16,12 @@ type Message = {
   content: string
 }
 
-// ── Set this to the mode you want to test ─────────────────────────────────────
-// "stream"   → Haiku tool loop + Sonnet streaming reply (best latency + UX)
-// "original" → baseline (unchanged behavior)
-const LATENCY_MODE = "stream"
+type FeedbackDialogState = {
+  open: boolean
+  messageId: string
+  index: number
+  messageContent: string
+}
 
 export function Chatbot() {
   const [input, setInput] = useState("")
@@ -28,6 +31,7 @@ export function Chatbot() {
   const [streamingText, setStreamingText] = useState("")
   const [streamPhase, setStreamPhase] = useState<"thinking" | "fetching" | "responding" | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialogState | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -39,7 +43,7 @@ export function Chatbot() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, streamingText])
 
-  async function handleRate(messageId: string, rating: Rating, index?: number) {
+  async function handleRate(messageId: string, rating: Rating, index?: number, messageContent?: string) {
     if (!sessionId || index === undefined) return
 
     const newRating = ratings[messageId] === rating ? null : rating
@@ -48,105 +52,67 @@ export function Chatbot() {
       [messageId]: newRating,
     }))
 
-    if (newRating) {
-      try {
-        await fetch("/api/rating", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session_id: sessionId,
-            message_index: index,
-            rating: newRating === "up" ? "thumbs_up" : "thumbs_down"
-          }),
-        })
-      } catch (err) {
-        console.error("Failed to submit rating:", err)
-      }
+    if (!newRating) return
+
+    if (newRating === "down") {
+      // Open feedback dialog instead of immediately posting
+      setFeedbackDialog({
+        open: true,
+        messageId,
+        index,
+        messageContent: messageContent ?? "",
+      })
+      return
+    }
+
+    // Thumbs up: post immediately
+    try {
+      await fetch("/api/rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message_index: index,
+          message_content: messageContent ?? null,
+          rating: "thumbs_up",
+        }),
+      })
+    } catch (err) {
+      console.error("Failed to submit rating:", err)
     }
   }
 
-  // ── Option 1: streaming fetch via SSE ──────────────────────────────────────
-  async function handleStreamingSubmit(userInput: string) {
-    const response = await fetch(`/api/chat?mode=stream`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: userInput, session_id: sessionId }),
-    })
+  async function handleFeedbackSubmit(reason: string | null, feedbackText: string) {
+    if (!feedbackDialog || !sessionId) return
+    const { messageId, index, messageContent } = feedbackDialog
+    setFeedbackDialog(null)
 
-    if (!response.ok || !response.body) {
-      throw new Error(`HTTP ${response.status}`)
+    try {
+      await fetch("/api/rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message_index: index,
+          message_content: messageContent || null,
+          rating: "thumbs_down",
+          reason: reason,
+          feedback_text: feedbackText || null,
+        }),
+      })
+    } catch (err) {
+      console.error("Failed to submit rating:", err)
     }
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ""
-    let accumulated = ""
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split("\n")
-      buffer = lines.pop() ?? "" // keep incomplete line in buffer
-
-      for (const line of lines) {
-        if (line.startsWith("event: ")) {
-          // event name on this line, data on next — handled below
-        } else if (line.startsWith("data: ")) {
-          const raw = line.slice(6)
-          try {
-            const parsed = JSON.parse(raw)
-
-            if (parsed.phase) {
-              setStreamPhase(parsed.phase)
-            } else if (parsed.text !== undefined) {
-              accumulated += parsed.text
-              setStreamingText(accumulated)
-            } else if (parsed.session_id) {
-              // done event — commit the streamed text as a real message
-              const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: accumulated,
-              }
-              setMessages((prev) => [...prev, assistantMessage])
-              setStreamingText("")
-              setStreamPhase(null)
-            } else if (parsed.message) {
-              // error event
-              throw new Error(parsed.message)
-            }
-          } catch {
-            // non-JSON data line — ignore
-          }
-        }
-      }
-    }
-
-    return accumulated
   }
 
-  // ── Non-streaming fetch (Options 2, 3, original) ───────────────────────────
-  async function handleJsonSubmit(userInput: string) {
-    const response = await fetch(`/api/chat?mode=${LATENCY_MODE}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: userInput, session_id: sessionId }),
-    })
-
-    const data = await response.json()
-
-    if (data.reply) {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.reply,
-      }
-      setMessages((prev) => [...prev, assistantMessage])
-    } else {
-      throw new Error(data.error || "Failed to get reply")
-    }
+  function handleFeedbackCancel() {
+    if (!feedbackDialog) return
+    // Revert the optimistic thumbs-down state
+    setRatings((prev) => ({
+      ...prev,
+      [feedbackDialog.messageId]: null,
+    }))
+    setFeedbackDialog(null)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -324,7 +290,7 @@ export function Chatbot() {
                       {!isUser && (
                         <div className="mt-1.5 flex items-center gap-1 px-1">
                           <button
-                            onClick={() => handleRate(message.id, "up", index)}
+                            onClick={() => handleRate(message.id, "up", index, message.content)}
                             className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings[message.id] === "up"
                               ? "bg-primary/15 text-primary"
                               : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
@@ -334,7 +300,7 @@ export function Chatbot() {
                             <ThumbsUp className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => handleRate(message.id, "down", index)}
+                            onClick={() => handleRate(message.id, "down", index, message.content)}
                             className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings[message.id] === "down"
                               ? "bg-destructive/15 text-destructive"
                               : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
@@ -435,6 +401,12 @@ export function Chatbot() {
           </div>
         </div>
       </div>
+
+      <FeedbackDialog
+        open={feedbackDialog?.open ?? false}
+        onOpenChange={(open) => { if (!open) handleFeedbackCancel() }}
+        onSubmit={handleFeedbackSubmit}
+      />
     </section>
   )
 }
