@@ -141,19 +141,29 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                     });
                 }
 
-                // Phase 2: Sonnet streams the final reply with full doc context from Haiku
+                // Phase 2: Sonnet streams the final reply with full doc context from Haiku.
                 send('status', JSON.stringify({ phase: 'responding' }));
                 console.log('[stream] haiku done, handing off to sonnet for streaming reply');
-                console.log('[stream] messages count before sonnet:', messages.length);
 
-                // NOTE: do NOT pass tools: [] — when tool_result turns exist in messages,
-                // the API requires tool definitions to be present or omitted entirely.
-                // Passing an empty array with tool_result turns causes an API error.
+                // After Haiku's tool loop, `messages` ends with a tool_result user turn.
+                // Passing this directly to Sonnet (with no tools defined) causes an empty
+                // response — Sonnet sees tool_results but doesn't know to generate text.
+                //
+                // Fix: append Haiku's final end_turn content as an assistant message (it
+                // may be empty/minimal), then add a plain user turn so Sonnet has a clear
+                // instruction to respond to.
+                if (haikiResponse.content.length > 0) {
+                    messages.push({ role: 'assistant', content: haikiResponse.content });
+                }
+                messages.push({ role: 'user', content: 'Now please answer the question using the documents retrieved above.' });
+
+                console.log('[stream] sonnet messages count:', messages.length);
+
                 const streamResp = anthropic.messages.stream({
                     model: RESPONSE_MODEL,
                     max_tokens: 300,
                     system: [systemBlock],
-                    messages,    // contains routing-index + doc content from Haiku's tool calls
+                    messages,
                 });
 
                 let fullText = '';
