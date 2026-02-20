@@ -152,7 +152,7 @@ export function Chatbot() {
                 </span>
                 <div 
                   className="rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
-                  style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal', maxWidth: '75%', display: 'inline-block' }}
+                  style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal', maxWidth: '60%', display: 'inline-block' }}
                 >
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {PERSONAL_INFO.proxie.greeting}
@@ -216,7 +216,7 @@ export function Chatbot() {
                     <div
                       className={`flex flex-col ${isUser ? "items-end" : "items-start"
                         }`}
-                      style={{ maxWidth: '75%' }}
+                      style={{ maxWidth: '60%' }}
                     >
                       {/* Label */}
                       <span className="mb-1 px-1 text-xs text-muted-foreground">
