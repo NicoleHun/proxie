@@ -45,9 +45,10 @@ export async function POST(req: NextRequest) {
         }
 
 
-        // 3. Update history with user message
+        // 3. Update history with user message — filter out any empty assistant turns from previous failures
         const userMessage = { role: 'user', content: message };
-        const updatedHistory = [...history, userMessage];
+        const cleanHistory = history.filter((m: any) => m.content && m.content.trim() !== '')
+        const updatedHistory = [...cleanHistory, userMessage];
 
         // Build MCP URL — VERCEL_URL is hostname-only in production (no protocol)
         const vercelUrl = process.env.VERCEL_URL ?? ''
@@ -55,6 +56,13 @@ export async function POST(req: NextRequest) {
             ? `${vercelUrl}/api/mcp`
             : `https://${vercelUrl}/api/mcp`
         console.log('[chat] MCP URL:', mcpUrl)
+
+        const model = "claude-sonnet-4-6"
+        const betaHeader = "mcp-client-2025-04-04"
+        console.log('[chat] calling anthropic | model:', model, '| beta:', betaHeader)
+        console.log('[chat] mcp url:', mcpUrl)
+        console.log('[chat] history length:', updatedHistory.length)
+        console.log('[chat] system prompt length:', systemPrompt.length)
 
         // 4. Call Anthropic API — MCP only (prompt-caching removed to isolate 500)
         const response = await (anthropic.messages.create as any)({
@@ -71,15 +79,21 @@ export async function POST(req: NextRequest) {
                 }
             ]
         }, {
-            headers: {
-                "anthropic-beta": "mcp-client-2025-04-04"
-            }
+            headers: { "anthropic-beta": betaHeader }
         });
+        console.log('[chat] anthropic responded | stop_reason:', response.stop_reason)
+        console.log('[chat] content blocks:', JSON.stringify(response.content?.map((b: any) => ({ type: b.type, len: b.text?.length }))))
 
         const assistantReply = response.content
             .filter((block: any) => block.type === 'text')
             .map((block: any) => block.text)
             .join('')
+
+        console.log('[chat] assistantReply length:', assistantReply.length)
+        if (!assistantReply) {
+            console.error('[chat] WARNING: empty reply from Claude — not saving to history')
+            return NextResponse.json({ reply: "I'm having trouble retrieving the knowledge base right now. Please try again.", session_id, round_count: roundCount });
+        }
 
         const assistantMessage = { role: 'assistant', content: assistantReply };
 
