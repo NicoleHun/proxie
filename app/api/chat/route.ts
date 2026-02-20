@@ -35,15 +35,15 @@ export async function POST(req: NextRequest) {
             history = session[0].conversation_history;
         }
 
-        // 2. Prepare System Prompt
-        let systemPrompt = PROXIE_SYSTEM_PROMPT;
-        const CTA_PROMPT = "\n\n(Note: It's a good moment to naturally surface a CTA. Encourage the user to connect with Nicole directly — suggest scheduling a 20-minute call at https://calendly.com/nicolechat/new-meeting. Be warm and non-pushy. Surface it once naturally.)";
-
-        const shouldSendCTA = roundCount === 5 || roundCount === 8 || roundCount === 10 || roundCount >= 11;
-        if (shouldSendCTA) systemPrompt += CTA_PROMPT;
+        // 2. System prompt is immutable — never mutated, always cache-hits after first request
+        const systemPrompt = PROXIE_SYSTEM_PROMPT;
 
         // 3. Build message history — filter out empty assistant turns from previous failures
-        const userMessage = { role: 'user' as const, content: message };
+        const shouldSendCTA = roundCount === 5 || roundCount === 8 || roundCount === 10 || roundCount >= 11;
+        const CTA_NOTE = "\n\n(Note: It's a good moment to naturally surface a CTA. Encourage the user to connect with Nicole directly — suggest scheduling a 20-minute meeting at https://calendly.com/nicolechat/new-meeting. Be warm and non-pushy. Surface it once naturally.)";
+
+        const userContent = shouldSendCTA ? `${message}${CTA_NOTE}` : message;
+        const userMessage = { role: 'user' as const, content: userContent };
         const cleanHistory = history.filter((m: any) => m.content && m.content.trim() !== '')
         const messages: any[] = [...cleanHistory, userMessage];
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         //    Claude calls fetch_kb_doc / list_kb_docs, we execute them, feed results back
         let response = await anthropic.messages.create({
             model: 'claude-sonnet-4-6',
-            max_tokens: 1500,
+            max_tokens: 300,
             system: [
                 {
                     type: 'text',
@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
             messages,
         });
 
+        console.log('[cache] initial:', response.usage);
         console.log('[chat] initial stop_reason:', response.stop_reason);
 
         // Loop while Claude wants to use tools
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
 
             response = await anthropic.messages.create({
                 model: 'claude-sonnet-4-6',
-                max_tokens: 500,
+                max_tokens: 300,
                 system: [
                     {
                         type: 'text',
@@ -117,6 +118,7 @@ export async function POST(req: NextRequest) {
                 messages,
             });
 
+            console.log('[cache] follow-up:', response.usage);
             console.log('[chat] follow-up stop_reason:', response.stop_reason);
         }
 
