@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
         const userMessage = { role: 'user', content: message };
         const updatedHistory = [...history, userMessage];
 
-        // 4. Call Anthropic API with prompt caching
-        const response = await anthropic.messages.create({
+        // 4. Call Anthropic API with prompt caching + MCP
+        const response = await (anthropic.messages.create as any)({
             model: "claude-sonnet-4-6",
             max_tokens: 500,
             temperature: 0.7,
@@ -58,15 +58,28 @@ export async function POST(req: NextRequest) {
                 {
                     type: "text",
                     text: systemPrompt,
-                    cache_control: { type: "ephemeral" } as any
+                    cache_control: { type: "ephemeral" }
                 }
             ],
             messages: updatedHistory,
+            mcp_servers: [
+                {
+                    type: 'url',
+                    url: `${process.env.VERCEL_URL}/api/mcp`,
+                    name: 'proxie-kb'
+                }
+            ]
         }, {
-            headers: { "anthropic-beta": "prompt-caching-2024-07-31" }
+            headers: {
+                "anthropic-beta": "prompt-caching-2024-07-31,mcp-client-2025-04-04"
+            }
         });
 
-        const assistantReply = response.content[0].type === 'text' ? response.content[0].text : '';
+        const assistantReply = response.content
+            .filter((block: any) => block.type === 'text')
+            .map((block: any) => block.text)
+            .join('')
+
         const assistantMessage = { role: 'assistant', content: assistantReply };
 
         // 5. Update DB
