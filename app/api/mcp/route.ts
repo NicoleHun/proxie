@@ -117,20 +117,35 @@ const MCP_TOOLS = [
 
 // ── HTTP Handler ──────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
+    let id: string | number | null = null
+
     try {
         const body = await request.json()
         const { method, params } = body
+        id = body.id ?? null
+
+        console.log('[mcp] method:', method, '| id:', id)
+
+        // JSON-RPC 2.0 helper
+        const ok = (result: unknown) => NextResponse.json({ jsonrpc: '2.0', id, result })
+        const err = (code: number, message: string) =>
+            NextResponse.json({ jsonrpc: '2.0', id, error: { code, message } })
 
         if (method === 'initialize') {
-            return NextResponse.json({
+            return ok({
                 protocolVersion: '2024-11-05',
                 capabilities: { tools: {} },
                 serverInfo: { name: 'proxie-kb', version: '1.0.0' }
             })
         }
 
+        if (method === 'notifications/initialized') {
+            // Notification — no response needed
+            return new NextResponse(null, { status: 204 })
+        }
+
         if (method === 'tools/list') {
-            return NextResponse.json({ tools: MCP_TOOLS })
+            return ok({ tools: MCP_TOOLS })
         }
 
         if (method === 'tools/call') {
@@ -138,35 +153,26 @@ export async function POST(request: NextRequest) {
 
             if (name === 'fetch_kb_doc') {
                 const content = await fetchDocByName(args.doc_name)
-                return NextResponse.json({
-                    content: [{ type: 'text', text: content }]
-                })
+                return ok({ content: [{ type: 'text', text: content }] })
             }
 
             if (name === 'list_kb_docs') {
                 const content = await listDocs()
-                return NextResponse.json({
-                    content: [{ type: 'text', text: content }]
-                })
+                return ok({ content: [{ type: 'text', text: content }] })
             }
 
-            return NextResponse.json(
-                { error: { code: -32601, message: `Unknown tool: ${name}` } },
-                { status: 400 }
-            )
+            return err(-32601, `Unknown tool: ${name}`)
         }
 
-        return NextResponse.json(
-            { error: { code: -32600, message: `Unknown method: ${method}` } },
-            { status: 400 }
-        )
+        return err(-32600, `Unknown method: ${method}`)
 
-    } catch (error) {
-        console.error('MCP route error:', error)
-        return NextResponse.json(
-            { error: { code: -32603, message: 'Internal server error' } },
-            { status: 500 }
-        )
+    } catch (error: any) {
+        console.error('[mcp] error:', error)
+        return NextResponse.json({
+            jsonrpc: '2.0',
+            id,
+            error: { code: -32603, message: 'Internal server error' }
+        }, { status: 500 })
     }
 }
 
