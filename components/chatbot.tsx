@@ -151,8 +151,8 @@ export function Chatbot() {
                   {PERSONAL_INFO.proxie.name}
                 </span>
                 <div 
-                  className="inline-block max-w-[75%] rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
-                  style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                  className="rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
+                  style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal', maxWidth: '75%', display: 'inline-block' }}
                 >
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {PERSONAL_INFO.proxie.greeting}
