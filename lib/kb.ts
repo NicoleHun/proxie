@@ -94,13 +94,13 @@ export async function listDocs(): Promise<string> {
 export const KB_TOOLS = [
     {
         name: 'fetch_kb_doc',
-        description: 'Fetch a specific document from the proxie-kb knowledge base by name. Always fetch 00-routing-index first to know which docs to retrieve next.',
+        description: 'Fetch a specific document from the proxie-kb knowledge base by name. Pick the most relevant doc(s) directly based on the question.',
         input_schema: {
             type: 'object' as const,
             properties: {
                 doc_name: {
                     type: 'string',
-                    description: 'Name of the doc to fetch. E.g. "00-routing-index", "work-history", "problem-solving-stories"'
+                    description: 'Name of the doc to fetch. E.g. "01-work-history", "03-drive-narrative", "05-technical-stack"'
                 }
             },
             required: ['doc_name']

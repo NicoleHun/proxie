@@ -23,6 +23,8 @@ type FeedbackDialogState = {
   messageContent: string
 }
 
+const LATENCY_MODE = "sonnet-stream"
+
 export function Chatbot() {
   const [input, setInput] = useState("")
   const [ratings, setRatings] = useState<Record<string, Rating>>({})
@@ -115,6 +117,83 @@ export function Chatbot() {
     setFeedbackDialog(null)
   }
 
+  async function handleStreamingSubmit(userInput: string) {
+    const response = await fetch(`/api/chat?mode=${LATENCY_MODE}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: userInput, session_id: sessionId }),
+    })
+
+    if (!response.ok || !response.body) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    let accumulated = ""
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() ?? ""
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const raw = line.slice(6)
+          try {
+            const parsed = JSON.parse(raw)
+            if (parsed.phase) {
+              setStreamPhase(parsed.phase)
+            } else if (parsed.text !== undefined) {
+              accumulated += parsed.text
+              setStreamingText(accumulated)
+            } else if (parsed.session_id) {
+              const assistantMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: accumulated,
+              }
+              setMessages((prev) => [...prev, assistantMessage])
+              setStreamingText("")
+              setStreamPhase(null)
+            } else if (parsed.message) {
+              throw new Error(parsed.message)
+            }
+          } catch {
+            // non-JSON data line — ignore
+          }
+        }
+      }
+    }
+
+    return accumulated
+  }
+
+  async function handleJsonSubmit(userInput: string) {
+    const response = await fetch(`/api/chat?mode=${LATENCY_MODE}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: userInput, session_id: sessionId }),
+    })
+
+    const data = await response.json()
+
+    if (data.reply) {
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.reply,
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+    } else {
+      throw new Error(data.error || "Failed to get reply")
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!input.trim() || isLoading || !sessionId) return
@@ -131,7 +210,7 @@ export function Chatbot() {
     setIsLoading(true)
 
     try {
-      if (LATENCY_MODE === "stream") {
+      if (LATENCY_MODE === "stream" || LATENCY_MODE === "sonnet-stream") {
         await handleStreamingSubmit(userInput)
       } else {
         await handleJsonSubmit(userInput)
