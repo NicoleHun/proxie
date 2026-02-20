@@ -28,20 +28,20 @@ export function Chatbot() {
   const [ratings, setRatings] = useState<Record<string, Rating>>({})
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [streamingText, setStreamingText] = useState("")
+  const [streamPhase, setStreamPhase] = useState<"thinking" | "fetching" | "responding" | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialogState | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Generate a fresh session ID on every page load
     const id = crypto.randomUUID()
     setSessionId(id)
-    // Start with empty messages array - backend will create new session automatically
   }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [messages, streamingText])
 
   async function handleRate(messageId: string, rating: Rating, index?: number, messageContent?: string) {
     if (!sessionId || index === undefined) return
@@ -126,33 +126,20 @@ export function Chatbot() {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    const userInput = input
     setInput("")
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: input,
-          session_id: sessionId
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.reply) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: data.reply,
-        }
-        setMessages((prev) => [...prev, assistantMessage])
+      if (LATENCY_MODE === "stream") {
+        await handleStreamingSubmit(userInput)
       } else {
-        throw new Error(data.error || "Failed to get reply")
+        await handleJsonSubmit(userInput)
       }
     } catch (err) {
       console.error("Chat error:", err)
+      setStreamingText("")
+      setStreamPhase(null)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -163,6 +150,13 @@ export function Chatbot() {
       setIsLoading(false)
     }
   }
+
+  // ── Status label shown during tool-fetching phase ─────────────────────────
+  const phaseLabel = streamPhase === "fetching"
+    ? "Looking up Nicole's info..."
+    : streamPhase === "thinking"
+    ? "Thinking..."
+    : null
 
   return (
     <section className="px-6 py-10">
@@ -205,7 +199,7 @@ export function Chatbot() {
                 <span className="mb-1 px-1 text-xs text-muted-foreground">
                   {PERSONAL_INFO.proxie.name}
                 </span>
-                <div 
+                <div
                   className="rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
                   style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal', maxWidth: '60%', display: 'inline-block' }}
                 >
@@ -322,8 +316,35 @@ export function Chatbot() {
                 )
               })}
 
-              {/* Typing indicator */}
-              {isLoading && (
+              {/* ── Option 1: Streaming response bubble ───────────────────── */}
+              {streamingText && (
+                <div className="flex items-end gap-2.5">
+                  <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-primary/80">
+                    <Image
+                      src="/proxie-avatar.png"
+                      alt="Proxie Avatar"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-col items-start" style={{ maxWidth: '60%' }}>
+                    <span className="mb-1 px-1 text-xs text-muted-foreground">
+                      {PERSONAL_INFO.proxie.name}
+                    </span>
+                    <div
+                      className="rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
+                      style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                    >
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {streamingText}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Typing indicator (shown during thinking/fetching, or non-streaming loading) */}
+              {isLoading && !streamingText && (
                 <div className="flex items-end gap-2.5">
                   <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-primary/80">
                     <Image
@@ -338,10 +359,17 @@ export function Chatbot() {
                       {PERSONAL_INFO.proxie.name}
                     </span>
                     <div className="rounded-2xl rounded-bl-md bg-secondary px-4 py-3">
-                      <div className="flex gap-1.5">
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:0ms]" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:150ms]" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:300ms]" />
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1.5">
+                          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:0ms]" />
+                          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:150ms]" />
+                          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:300ms]" />
+                        </div>
+                        {phaseLabel && (
+                          <span className="text-xs text-muted-foreground/70 italic">
+                            {phaseLabel}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
