@@ -79,9 +79,9 @@ function resolveDocsLocally(message: string): string[] {
         }
     }
 
-    // Default fallback
+    // Default fallback — general questions get work history
     if (matched.length === 0) {
-        matched.push('work-history');
+        matched.push('01-work-history');
     }
 
     return matched.slice(0, 2); // cap at 2 docs
