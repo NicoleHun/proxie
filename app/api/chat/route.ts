@@ -56,18 +56,12 @@ export async function POST(req: NextRequest) {
             : `https://${vercelUrl}/api/mcp`
         console.log('[chat] MCP URL:', mcpUrl)
 
-        // 4. Call Anthropic API with prompt caching + MCP
+        // 4. Call Anthropic API — MCP only (prompt-caching removed to isolate 500)
         const response = await (anthropic.messages.create as any)({
             model: "claude-sonnet-4-6",
             max_tokens: 500,
             temperature: 0.7,
-            system: [
-                {
-                    type: "text",
-                    text: systemPrompt,
-                    cache_control: { type: "ephemeral" }
-                }
-            ],
+            system: systemPrompt,
             messages: updatedHistory,
             mcp_servers: [
                 {
@@ -78,7 +72,7 @@ export async function POST(req: NextRequest) {
             ]
         }, {
             headers: {
-                "anthropic-beta": "prompt-caching-2024-07-31,mcp-client-2025-04-04"
+                "anthropic-beta": "mcp-client-2025-04-04"
             }
         });
 
