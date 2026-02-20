@@ -224,12 +224,12 @@ export function Chatbot() {
 
                       {/* Message Bubble */}
                       <div
-                        className={`inline-block max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 ${
+                        className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 ${
                           isUser
                             ? "rounded-br-md bg-primary text-primary-foreground prose-headings:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground prose-a:text-primary-foreground"
                             : "rounded-bl-md bg-secondary text-secondary-foreground prose-headings:text-secondary-foreground prose-strong:text-secondary-foreground prose-code:text-secondary-foreground prose-a:text-secondary-foreground"
                         }`}
-                        style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                        style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal', maxWidth: '75%', display: 'inline-block' }}
                       >
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {message.content}
