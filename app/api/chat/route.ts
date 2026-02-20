@@ -54,7 +54,13 @@ export async function POST(req: NextRequest) {
         let response = await anthropic.messages.create({
             model: 'claude-sonnet-4-6',
             max_tokens: 1500,
-            system: systemPrompt,
+            system: [
+                {
+                    type: 'text',
+                    text: systemPrompt,
+                    cache_control: { type: 'ephemeral' },
+                }
+            ],
             tools: KB_TOOLS as any,
             messages,
         });
@@ -100,7 +106,13 @@ export async function POST(req: NextRequest) {
             response = await anthropic.messages.create({
                 model: 'claude-sonnet-4-6',
                 max_tokens: 500,
-                system: systemPrompt,
+                system: [
+                    {
+                        type: 'text',
+                        text: systemPrompt,
+                        cache_control: { type: 'ephemeral' },
+                    }
+                ],
                 tools: KB_TOOLS as any,
                 messages,
             });
