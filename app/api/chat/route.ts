@@ -66,14 +66,14 @@ async function saveToDb(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OPTION 1: Streaming response via Server-Sent Events
+// OPTION 1 + 2 combined: Haiku tool loop → Sonnet streaming reply
 //
 // How it works:
-//   1. Run the agentic tool loop (non-streaming) so docs are fetched first
-//   2. Stream the final Claude response token-by-token to the frontend
-//   3. Frontend reads the SSE stream and appends tokens in real time
+//   1. Haiku runs the tool-use loop (routing-index + doc fetches) — fast & cheap
+//   2. Sonnet streams the final answer token-by-token over SSE
+//   3. Frontend renders tokens as they arrive — user sees words at ~2s
 //
-// The user sees the first words in ~2s instead of waiting the full 13s.
+// Best of both: real latency savings from Haiku + perceived speed from streaming.
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleStreaming(message: string, session_id: string): Promise<Response> {
@@ -89,22 +89,22 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
             }
 
             try {
-                // Phase 1: agentic tool loop (non-streaming) — lets Claude fetch docs
+                // Phase 1: Haiku drives the tool-use loop (fast routing + doc fetching)
                 send('status', JSON.stringify({ phase: 'thinking' }));
 
-                let toolResponse = await anthropic.messages.create({
-                    model: RESPONSE_MODEL,
-                    max_tokens: 300,
+                let haikiResponse = await anthropic.messages.create({
+                    model: ROUTING_MODEL,
+                    max_tokens: 150,
                     system: [systemBlock],
                     tools: KB_TOOLS as any,
                     messages,
                 });
 
-                while (toolResponse.stop_reason === 'tool_use') {
-                    const assistantContent = toolResponse.content;
+                while (haikiResponse.stop_reason === 'tool_use') {
+                    const assistantContent = haikiResponse.content;
                     const toolUseBlocks = assistantContent.filter((b: any) => b.type === 'tool_use');
 
-                    console.log('[stream] tool calls:', toolUseBlocks.map((b: any) => `${b.name}(${JSON.stringify(b.input)})`));
+                    console.log('[stream] haiku tool calls:', toolUseBlocks.map((b: any) => `${b.name}(${JSON.stringify(b.input)})`));
                     send('status', JSON.stringify({ phase: 'fetching' }));
 
                     const toolResults = await Promise.all(
@@ -132,55 +132,36 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                     messages.push({ role: 'assistant', content: assistantContent });
                     messages.push({ role: 'user', content: toolResults });
 
-                    toolResponse = await anthropic.messages.create({
-                        model: RESPONSE_MODEL,
-                        max_tokens: 180,
+                    haikiResponse = await anthropic.messages.create({
+                        model: ROUTING_MODEL,
+                        max_tokens: 150,
                         system: [systemBlock],
                         tools: KB_TOOLS as any,
                         messages,
                     });
                 }
 
-                // Phase 2: stream the final reply token by token
+                // Phase 2: Sonnet streams the final reply with full doc context from Haiku
                 send('status', JSON.stringify({ phase: 'responding' }));
+                console.log('[stream] haiku done, handing off to sonnet for streaming reply');
 
-                // If Claude already has a text reply from the tool loop, stream it
-                const existingText = toolResponse.content
-                    .filter((b: any) => b.type === 'text')
-                    .map((b: any) => b.text)
-                    .join('');
+                const streamResp = anthropic.messages.stream({
+                    model: RESPONSE_MODEL,
+                    max_tokens: 300,
+                    system: [systemBlock],
+                    tools: [],   // no tools — Haiku already fetched everything
+                    messages,    // contains routing-index + doc content from Haiku's tool calls
+                });
 
                 let fullText = '';
-
-                if (existingText) {
-                    // We have the full text already — forward it in chunks so the UI
-                    // can render progressively without an extra round-trip
-                    fullText = existingText;
-                    // Split into ~word-sized chunks and emit them
-                    const chunks = existingText.match(/\S+\s*/g) ?? [existingText];
-                    for (const chunk of chunks) {
-                        send('token', JSON.stringify({ text: chunk }));
-                        // yield to event loop so Next.js flushes the chunk
-                        await new Promise(r => setTimeout(r, 0));
-                    }
-                } else {
-                    // No text yet — make a fresh streaming call
-                    const streamResp = anthropic.messages.stream({
-                        model: RESPONSE_MODEL,
-                        max_tokens: 300,
-                        system: [systemBlock],
-                        messages,
-                    });
-
-                    for await (const chunk of streamResp) {
-                        if (
-                            chunk.type === 'content_block_delta' &&
-                            chunk.delta?.type === 'text_delta'
-                        ) {
-                            const text = (chunk.delta as any).text as string;
-                            fullText += text;
-                            send('token', JSON.stringify({ text }));
-                        }
+                for await (const chunk of streamResp) {
+                    if (
+                        chunk.type === 'content_block_delta' &&
+                        chunk.delta?.type === 'text_delta'
+                    ) {
+                        const text = (chunk.delta as any).text as string;
+                        fullText += text;
+                        send('token', JSON.stringify({ text }));
                     }
                 }
 
@@ -206,108 +187,6 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
             'Connection': 'keep-alive',
         },
     });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OPTION 3: Two-model — Haiku for tool calls, Sonnet for final answer
-//
-// How it works:
-//   1. Haiku runs the full tool-use loop (fetch routing-index + docs)
-//      Haiku is ~5x faster for simple decisions, so this saves 1-2s
-//   2. The doc context Haiku gathered is passed to Sonnet
-//   3. Sonnet writes the final polished response
-//
-// Saves 1-2s on routing/fetching, preserves Sonnet quality on the reply.
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function handleTwoModel(message: string, session_id: string): Promise<Response> {
-    const ctx = await buildContext(message, session_id);
-    const { messages, systemBlock, cleanHistory, userMessage, roundCount } = ctx;
-
-    // Phase 1: Haiku drives the tool-use loop (fast + cheap)
-    let haikusResponse = await anthropic.messages.create({
-        model: ROUTING_MODEL,
-        max_tokens: 150, // Haiku only emits tool calls here, not prose
-        system: [systemBlock],
-        tools: KB_TOOLS as any,
-        messages,
-    });
-
-    console.log('[two-model] haiku initial stop_reason:', haikusResponse.stop_reason);
-
-    while (haikusResponse.stop_reason === 'tool_use') {
-        const assistantContent = haikusResponse.content;
-        const toolUseBlocks = assistantContent.filter((b: any) => b.type === 'tool_use');
-
-        console.log('[two-model] haiku tool calls:', toolUseBlocks.map((b: any) => `${b.name}(${JSON.stringify(b.input)})`));
-
-        const toolResults = await Promise.all(
-            toolUseBlocks.map(async (block: any) => {
-                let result: string;
-                try {
-                    if (block.name === 'fetch_kb_doc') {
-                        result = await fetchDocByName(block.input.doc_name);
-                    } else if (block.name === 'list_kb_docs') {
-                        result = await listDocs();
-                    } else {
-                        result = `Unknown tool: ${block.name}`;
-                    }
-                } catch (err: any) {
-                    result = `Error executing ${block.name}: ${err.message}`;
-                }
-                return {
-                    type: 'tool_result' as const,
-                    tool_use_id: block.id,
-                    content: result,
-                };
-            })
-        );
-
-        messages.push({ role: 'assistant', content: assistantContent });
-        messages.push({ role: 'user', content: toolResults });
-
-        haikusResponse = await anthropic.messages.create({
-            model: ROUTING_MODEL,
-            max_tokens: 150,
-            system: [systemBlock],
-            tools: KB_TOOLS as any,
-            messages,
-        });
-
-        console.log('[two-model] haiku follow-up stop_reason:', haikusResponse.stop_reason);
-    }
-
-    // Phase 2: Sonnet writes the final reply with the full doc context Haiku fetched
-    const finalResponse = await anthropic.messages.create({
-        model: RESPONSE_MODEL,
-        max_tokens: 300,
-        system: [systemBlock],
-        tools: [], // No tools — Haiku already fetched everything
-        messages,  // Contains routing-index + doc content from Haiku's tool calls
-    });
-
-    const u = finalResponse.usage as any;
-    console.log('[two-model] sonnet usage:', {
-        cache_read: u.cache_read_input_tokens ?? 0,
-        input: u.input_tokens,
-        output: u.output_tokens,
-    });
-
-    const assistantReply = finalResponse.content
-        .filter((b: any) => b.type === 'text')
-        .map((b: any) => b.text)
-        .join('');
-
-    if (!assistantReply) {
-        return NextResponse.json({
-            reply: "I'm having trouble right now. Please try again.",
-            session_id,
-            round_count: roundCount,
-        });
-    }
-
-    const newRoundCount = await saveToDb(session_id, cleanHistory, userMessage, assistantReply, roundCount);
-    return NextResponse.json({ reply: assistantReply, session_id, round_count: newRoundCount });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -439,9 +318,8 @@ async function handleOriginal(message: string, session_id: string): Promise<Resp
 // Main POST handler
 //
 // Select mode via query param or LATENCY_MODE env var:
-//   ?mode=stream    → Option 1: SSE streaming (biggest perceived speedup)
-//   ?mode=twomodel  → Option 2: Haiku tool calls + Sonnet answer (saves ~1-2s)
-//   (default)       → original behavior (unchanged)
+//   ?mode=stream  → Haiku tool loop + Sonnet streaming reply (best of both)
+//   (default)     → original behavior (unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -465,8 +343,6 @@ export async function POST(req: NextRequest) {
         switch (mode) {
             case 'stream':
                 return handleStreaming(message, session_id);
-            case 'twomodel':
-                return handleTwoModel(message, session_id);
             default:
                 return handleOriginal(message, session_id);
         }
