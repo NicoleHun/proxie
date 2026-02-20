@@ -6,6 +6,7 @@ import { PERSONAL_INFO } from "@/lib/constants"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import Image from "next/image"
+import { FeedbackDialog } from "@/components/feedback-dialog"
 
 type Rating = "up" | "down" | null
 
@@ -15,12 +16,20 @@ type Message = {
   content: string
 }
 
+type FeedbackDialogState = {
+  open: boolean
+  messageId: string
+  index: number
+  messageContent: string
+}
+
 export function Chatbot() {
   const [input, setInput] = useState("")
   const [ratings, setRatings] = useState<Record<string, Rating>>({})
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialogState | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -34,7 +43,7 @@ export function Chatbot() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  async function handleRate(messageId: string, rating: Rating, index?: number) {
+  async function handleRate(messageId: string, rating: Rating, index?: number, messageContent?: string) {
     if (!sessionId || index === undefined) return
 
     const newRating = ratings[messageId] === rating ? null : rating
@@ -43,21 +52,67 @@ export function Chatbot() {
       [messageId]: newRating,
     }))
 
-    if (newRating) {
-      try {
-        await fetch("/api/rating", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session_id: sessionId,
-            message_index: index,
-            rating: newRating === "up" ? "thumbs_up" : "thumbs_down"
-          }),
-        })
-      } catch (err) {
-        console.error("Failed to submit rating:", err)
-      }
+    if (!newRating) return
+
+    if (newRating === "down") {
+      // Open feedback dialog instead of immediately posting
+      setFeedbackDialog({
+        open: true,
+        messageId,
+        index,
+        messageContent: messageContent ?? "",
+      })
+      return
     }
+
+    // Thumbs up: post immediately
+    try {
+      await fetch("/api/rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message_index: index,
+          message_content: messageContent ?? null,
+          rating: "thumbs_up",
+        }),
+      })
+    } catch (err) {
+      console.error("Failed to submit rating:", err)
+    }
+  }
+
+  async function handleFeedbackSubmit(reason: string | null, feedbackText: string) {
+    if (!feedbackDialog || !sessionId) return
+    const { messageId, index, messageContent } = feedbackDialog
+    setFeedbackDialog(null)
+
+    try {
+      await fetch("/api/rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message_index: index,
+          message_content: messageContent || null,
+          rating: "thumbs_down",
+          reason: reason,
+          feedback_text: feedbackText || null,
+        }),
+      })
+    } catch (err) {
+      console.error("Failed to submit rating:", err)
+    }
+  }
+
+  function handleFeedbackCancel() {
+    if (!feedbackDialog) return
+    // Revert the optimistic thumbs-down state
+    setRatings((prev) => ({
+      ...prev,
+      [feedbackDialog.messageId]: null,
+    }))
+    setFeedbackDialog(null)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -241,7 +296,7 @@ export function Chatbot() {
                       {!isUser && (
                         <div className="mt-1.5 flex items-center gap-1 px-1">
                           <button
-                            onClick={() => handleRate(message.id, "up", index)}
+                            onClick={() => handleRate(message.id, "up", index, message.content)}
                             className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings[message.id] === "up"
                               ? "bg-primary/15 text-primary"
                               : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
@@ -251,7 +306,7 @@ export function Chatbot() {
                             <ThumbsUp className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => handleRate(message.id, "down", index)}
+                            onClick={() => handleRate(message.id, "down", index, message.content)}
                             className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings[message.id] === "down"
                               ? "bg-destructive/15 text-destructive"
                               : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
@@ -318,6 +373,12 @@ export function Chatbot() {
           </div>
         </div>
       </div>
+
+      <FeedbackDialog
+        open={feedbackDialog?.open ?? false}
+        onOpenChange={(open) => { if (!open) handleFeedbackCancel() }}
+        onSubmit={handleFeedbackSubmit}
+      />
     </section>
   )
 }
