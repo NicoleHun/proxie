@@ -24,33 +24,10 @@ export function Chatbot() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Initialize or retrieve session ID
-    let id = localStorage.getItem("proxie_session_id")
-    if (!id) {
-      id = crypto.randomUUID()
-      localStorage.setItem("proxie_session_id", id)
-    }
+    // Generate a fresh session ID on every page load
+    const id = crypto.randomUUID()
     setSessionId(id)
-
-    // Load existing messages if any
-    const fetchSession = async () => {
-      try {
-        const res = await fetch(`/api/session?session_id=${id}`)
-        if (res.ok) {
-          const data = await res.json()
-          if (data.conversation_history) {
-            setMessages(data.conversation_history.map((m: any, i: number) => ({
-              id: `msg-${i}`,
-              role: m.role,
-              content: m.content
-            })))
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch session:", err)
-      }
-    }
-    fetchSession()
+    // Start with empty messages array - backend will create new session automatically
   }, [])
 
   useEffect(() => {
