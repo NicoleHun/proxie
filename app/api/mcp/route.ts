@@ -21,7 +21,13 @@ function setCache(key: string, content: string) {
 
 // ── Google Drive client ───────────────────────────────────────────────────────
 function getDriveClient() {
-    const key = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!)
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+    if (!raw) throw new Error('[mcp] GOOGLE_SERVICE_ACCOUNT_KEY is not set')
+    if (!process.env.GOOGLE_DRIVE_FOLDER_ID) throw new Error('[mcp] GOOGLE_DRIVE_FOLDER_ID is not set')
+
+    const key = JSON.parse(raw)
+    console.log('[mcp] auth as:', key.client_email)
+
     const auth = new google.auth.GoogleAuth({
         credentials: key,
         scopes: ['https://www.googleapis.com/auth/drive.readonly'],
@@ -35,6 +41,7 @@ async function fetchDocByName(name: string): Promise<string> {
     const cached = getCached(cacheKey)
     if (cached) return cached
 
+    console.log('[mcp] fetchDocByName:', name)
     const drive = getDriveClient()
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID!
 
@@ -45,8 +52,10 @@ async function fetchDocByName(name: string): Promise<string> {
 
     const files = search.data.files
     if (!files || files.length === 0) {
+        console.log('[mcp] no file found for:', name)
         return `No document found matching "${name}" in proxie-kb.`
     }
+    console.log('[mcp] found file:', files[0].name, files[0].mimeType)
 
     const file = files[0]
     let content = ''
