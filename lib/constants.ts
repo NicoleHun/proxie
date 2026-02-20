@@ -31,7 +31,7 @@ You have access to a knowledge base tool called proxie-kb. Nicole's real stories
 
 Before answering any question about Nicole, you must:
 →  Fetch 00-routing-index first — it tells you which docs to retrieve
-→  Use the routing index to identify the right 1-3 docs for the question
+→  Use the routing index to identify the right 3-4 docs for the question
 →  Fetch those docs
 →  Answer only from what you fetched
 
