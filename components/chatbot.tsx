@@ -216,6 +216,7 @@ export function Chatbot() {
                     <div
                       className={`flex flex-col ${isUser ? "items-end" : "items-start"
                         }`}
+                      style={{ maxWidth: '75%' }}
                     >
                       {/* Label */}
                       <span className="mb-1 px-1 text-xs text-muted-foreground">
@@ -229,7 +230,7 @@ export function Chatbot() {
                             ? "rounded-br-md bg-primary text-primary-foreground prose-headings:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground prose-a:text-primary-foreground"
                             : "rounded-bl-md bg-secondary text-secondary-foreground prose-headings:text-secondary-foreground prose-strong:text-secondary-foreground prose-code:text-secondary-foreground prose-a:text-secondary-foreground"
                         }`}
-                        style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal', maxWidth: '75%', display: 'inline-block' }}
+                        style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal' }}
                       >
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {message.content}
