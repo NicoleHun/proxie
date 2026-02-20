@@ -49,6 +49,13 @@ export async function POST(req: NextRequest) {
         const userMessage = { role: 'user', content: message };
         const updatedHistory = [...history, userMessage];
 
+        // Build MCP URL — VERCEL_URL is hostname-only in production (no protocol)
+        const vercelUrl = process.env.VERCEL_URL ?? ''
+        const mcpUrl = vercelUrl.startsWith('http')
+            ? `${vercelUrl}/api/mcp`
+            : `https://${vercelUrl}/api/mcp`
+        console.log('[chat] MCP URL:', mcpUrl)
+
         // 4. Call Anthropic API with prompt caching + MCP
         const response = await (anthropic.messages.create as any)({
             model: "claude-sonnet-4-6",
@@ -65,7 +72,7 @@ export async function POST(req: NextRequest) {
             mcp_servers: [
                 {
                     type: 'url',
-                    url: `${process.env.VERCEL_URL}/api/mcp`,
+                    url: mcpUrl,
                     name: 'proxie-kb'
                 }
             ]
@@ -98,7 +105,9 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (error: any) {
-        console.error('Chat API Error:', error);
+        console.error('[chat] Error status:', error?.status)
+        console.error('[chat] Error body:', JSON.stringify(error?.error ?? error?.message))
+        console.error('[chat] Request ID:', error?.requestID)
         return NextResponse.json({
             error: 'Failed to process chat',
             details: error.message
