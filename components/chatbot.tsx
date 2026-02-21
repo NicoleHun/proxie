@@ -6,6 +6,7 @@ import { PERSONAL_INFO } from "@/lib/constants"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import Image from "next/image"
+import { FeedbackDialog } from "@/components/feedback-dialog"
 
 type Rating = "up" | "down" | null
 
@@ -15,26 +16,36 @@ type Message = {
   content: string
 }
 
+type FeedbackDialogState = {
+  open: boolean
+  messageId: string
+  index: number
+  messageContent: string
+}
+
+const LATENCY_MODE = "sonnet-stream"
+
 export function Chatbot() {
   const [input, setInput] = useState("")
   const [ratings, setRatings] = useState<Record<string, Rating>>({})
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [streamingText, setStreamingText] = useState("")
+  const [streamPhase, setStreamPhase] = useState<"thinking" | "fetching" | "responding" | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialogState | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Generate a fresh session ID on every page load
     const id = crypto.randomUUID()
     setSessionId(id)
-    // Start with empty messages array - backend will create new session automatically
   }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [messages, streamingText])
 
-  async function handleRate(messageId: string, rating: Rating, index?: number) {
+  async function handleRate(messageId: string, rating: Rating, index?: number, messageContent?: string) {
     if (!sessionId || index === undefined) return
 
     const newRating = ratings[messageId] === rating ? null : rating
@@ -43,20 +54,143 @@ export function Chatbot() {
       [messageId]: newRating,
     }))
 
-    if (newRating) {
-      try {
-        await fetch("/api/rating", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session_id: sessionId,
-            message_index: index,
-            rating: newRating === "up" ? "thumbs_up" : "thumbs_down"
-          }),
-        })
-      } catch (err) {
-        console.error("Failed to submit rating:", err)
+    if (!newRating) return
+
+    if (newRating === "down") {
+      // Open feedback dialog instead of immediately posting
+      setFeedbackDialog({
+        open: true,
+        messageId,
+        index,
+        messageContent: messageContent ?? "",
+      })
+      return
+    }
+
+    // Thumbs up: post immediately
+    try {
+      await fetch("/api/rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message_index: index,
+          message_content: messageContent ?? null,
+          rating: "thumbs_up",
+        }),
+      })
+    } catch (err) {
+      console.error("Failed to submit rating:", err)
+    }
+  }
+
+  async function handleFeedbackSubmit(reason: string | null, feedbackText: string) {
+    if (!feedbackDialog || !sessionId) return
+    const { messageId, index, messageContent } = feedbackDialog
+    setFeedbackDialog(null)
+
+    try {
+      await fetch("/api/rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message_index: index,
+          message_content: messageContent || null,
+          rating: "thumbs_down",
+          reason: reason,
+          feedback_text: feedbackText || null,
+        }),
+      })
+    } catch (err) {
+      console.error("Failed to submit rating:", err)
+    }
+  }
+
+  function handleFeedbackCancel() {
+    if (!feedbackDialog) return
+    // Revert the optimistic thumbs-down state
+    setRatings((prev) => ({
+      ...prev,
+      [feedbackDialog.messageId]: null,
+    }))
+    setFeedbackDialog(null)
+  }
+
+  async function handleStreamingSubmit(userInput: string) {
+    const response = await fetch(`/api/chat?mode=${LATENCY_MODE}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: userInput, session_id: sessionId }),
+    })
+
+    if (!response.ok || !response.body) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    let accumulated = ""
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() ?? ""
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const raw = line.slice(6)
+          try {
+            const parsed = JSON.parse(raw)
+            if (parsed.phase) {
+              setStreamPhase(parsed.phase)
+            } else if (parsed.text !== undefined) {
+              accumulated += parsed.text
+              setStreamingText(accumulated)
+            } else if (parsed.session_id) {
+              const assistantMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: accumulated,
+              }
+              setMessages((prev) => [...prev, assistantMessage])
+              setStreamingText("")
+              setStreamPhase(null)
+            } else if (parsed.message) {
+              throw new Error(parsed.message)
+            }
+          } catch {
+            // non-JSON data line — ignore
+          }
+        }
       }
+    }
+
+    return accumulated
+  }
+
+  async function handleJsonSubmit(userInput: string) {
+    const response = await fetch(`/api/chat?mode=${LATENCY_MODE}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: userInput, session_id: sessionId }),
+    })
+
+    const data = await response.json()
+
+    if (data.reply) {
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.reply,
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+    } else {
+      throw new Error(data.error || "Failed to get reply")
     }
   }
 
@@ -71,33 +205,20 @@ export function Chatbot() {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    const userInput = input
     setInput("")
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: input,
-          session_id: sessionId
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.reply) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: data.reply,
-        }
-        setMessages((prev) => [...prev, assistantMessage])
+      if (LATENCY_MODE === "stream" || LATENCY_MODE === "sonnet-stream") {
+        await handleStreamingSubmit(userInput)
       } else {
-        throw new Error(data.error || "Failed to get reply")
+        await handleJsonSubmit(userInput)
       }
     } catch (err) {
       console.error("Chat error:", err)
+      setStreamingText("")
+      setStreamPhase(null)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -108,6 +229,13 @@ export function Chatbot() {
       setIsLoading(false)
     }
   }
+
+  // ── Status label shown during tool-fetching phase ─────────────────────────
+  const phaseLabel = streamPhase === "fetching"
+    ? "Looking up Nicole's info..."
+    : streamPhase === "thinking"
+    ? "Thinking..."
+    : null
 
   return (
     <section className="px-6 py-10">
@@ -150,7 +278,7 @@ export function Chatbot() {
                 <span className="mb-1 px-1 text-xs text-muted-foreground">
                   {PERSONAL_INFO.proxie.name}
                 </span>
-                <div 
+                <div
                   className="rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
                   style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal', maxWidth: '60%', display: 'inline-block' }}
                 >
@@ -241,7 +369,7 @@ export function Chatbot() {
                       {!isUser && (
                         <div className="mt-1.5 flex items-center gap-1 px-1">
                           <button
-                            onClick={() => handleRate(message.id, "up", index)}
+                            onClick={() => handleRate(message.id, "up", index, message.content)}
                             className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings[message.id] === "up"
                               ? "bg-primary/15 text-primary"
                               : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
@@ -251,7 +379,7 @@ export function Chatbot() {
                             <ThumbsUp className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => handleRate(message.id, "down", index)}
+                            onClick={() => handleRate(message.id, "down", index, message.content)}
                             className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings[message.id] === "down"
                               ? "bg-destructive/15 text-destructive"
                               : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
@@ -267,8 +395,35 @@ export function Chatbot() {
                 )
               })}
 
-              {/* Typing indicator */}
-              {isLoading && (
+              {/* ── Option 1: Streaming response bubble ───────────────────── */}
+              {streamingText && (
+                <div className="flex items-end gap-2.5">
+                  <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-primary/80">
+                    <Image
+                      src="/proxie-avatar.png"
+                      alt="Proxie Avatar"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-col items-start" style={{ maxWidth: '60%' }}>
+                    <span className="mb-1 px-1 text-xs text-muted-foreground">
+                      {PERSONAL_INFO.proxie.name}
+                    </span>
+                    <div
+                      className="rounded-2xl rounded-bl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0"
+                      style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                    >
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {streamingText}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Typing indicator (shown during thinking/fetching, or non-streaming loading) */}
+              {isLoading && !streamingText && (
                 <div className="flex items-end gap-2.5">
                   <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border-2 border-primary/80">
                     <Image
@@ -283,10 +438,17 @@ export function Chatbot() {
                       {PERSONAL_INFO.proxie.name}
                     </span>
                     <div className="rounded-2xl rounded-bl-md bg-secondary px-4 py-3">
-                      <div className="flex gap-1.5">
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:0ms]" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:150ms]" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:300ms]" />
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1.5">
+                          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:0ms]" />
+                          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:150ms]" />
+                          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:300ms]" />
+                        </div>
+                        {phaseLabel && (
+                          <span className="text-xs text-muted-foreground/70 italic">
+                            {phaseLabel}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -318,6 +480,12 @@ export function Chatbot() {
           </div>
         </div>
       </div>
+
+      <FeedbackDialog
+        open={feedbackDialog?.open ?? false}
+        onOpenChange={(open) => { if (!open) handleFeedbackCancel() }}
+        onSubmit={handleFeedbackSubmit}
+      />
     </section>
   )
 }

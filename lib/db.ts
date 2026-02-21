@@ -21,10 +21,18 @@ export async function initDb() {
       id SERIAL PRIMARY KEY,
       session_id TEXT REFERENCES sessions(id),
       message_index INTEGER,
+      message_content TEXT,
       rating TEXT CHECK (rating IN ('thumbs_up', 'thumbs_down')),
+      reason TEXT,
+      feedback_text TEXT,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
   `;
+
+  // Migrate existing tables to add new columns if they don't exist
+  await sql`ALTER TABLE ratings ADD COLUMN IF NOT EXISTS message_content TEXT`;
+  await sql`ALTER TABLE ratings ADD COLUMN IF NOT EXISTS reason TEXT`;
+  await sql`ALTER TABLE ratings ADD COLUMN IF NOT EXISTS feedback_text TEXT`;
 }
 
 export default sql;

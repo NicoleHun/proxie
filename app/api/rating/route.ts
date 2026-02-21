@@ -3,7 +3,7 @@ import sql, { initDb } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
     try {
-        const { session_id, message_index, rating } = await req.json();
+        const { session_id, message_index, rating, message_content, reason, feedback_text } = await req.json();
 
         if (!session_id || message_index === undefined || !rating) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
         }
 
         await sql`
-            INSERT INTO ratings (session_id, message_index, rating) VALUES (${session_id}, ${message_index}, ${rating})
+            INSERT INTO ratings (session_id, message_index, message_content, rating, reason, feedback_text)
+            VALUES (${session_id}, ${message_index}, ${message_content ?? null}, ${rating}, ${reason ?? null}, ${feedback_text ?? null})
         `;
 
         return NextResponse.json({ success: true });
