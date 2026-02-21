@@ -11,10 +11,9 @@ import {
 import { cn } from "@/lib/utils"
 
 const FEEDBACK_REASONS = [
-  "UI bug",
-  "Did not fully follow my request",
-  "Did not get what I need",
-  "Incomplete response",
+  "UI Issue",
+  "Lack of fluency and poorly articulated",
+  "Didn't fully follow my request",
   "I don't like the tone",
   "Others",
 ]

@@ -13,6 +13,9 @@ const anthropic = new Anthropic({
 const ROUTING_MODEL = 'claude-haiku-4-5-20251001';
 const RESPONSE_MODEL = 'claude-sonnet-4-6';
 
+// ── Prompt version — bump when system prompt or tool definitions change ────────
+const PROMPT_VERSION = 'v2.1';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,6 +80,7 @@ async function saveToDb(
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleStreaming(message: string, session_id: string): Promise<Response> {
+    const startTime = Date.now();
     const ctx = await buildContext(message, session_id);
     const { messages, systemBlock, cleanHistory, userMessage, roundCount } = ctx;
 
@@ -160,6 +164,7 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                 });
 
                 let fullText = '';
+                let outputTokenCount: number | null = null;
                 for await (const chunk of streamResp) {
                     if (
                         chunk.type === 'content_block_delta' &&
@@ -168,14 +173,17 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
                         const text = (chunk.delta as any).text as string;
                         fullText += text;
                         send('token', JSON.stringify({ text }));
+                    } else if (chunk.type === 'message_delta' && (chunk as any).usage) {
+                        outputTokenCount = (chunk as any).usage.output_tokens ?? null;
                     }
                 }
 
+                const serverLatencyMs = Date.now() - startTime;
                 console.log('[stream] sonnet reply length:', fullText.length);
 
                 if (fullText) {
                     const newRoundCount = await saveToDb(session_id, cleanHistory, userMessage, fullText, roundCount);
-                    send('done', JSON.stringify({ session_id, round_count: newRoundCount }));
+                    send('done', JSON.stringify({ session_id, round_count: newRoundCount, server_latency_ms: serverLatencyMs, output_token_count: outputTokenCount, prompt_version: PROMPT_VERSION }));
                 } else {
                     send('error', JSON.stringify({ message: 'Empty response from Claude' }));
                 }
@@ -204,6 +212,7 @@ async function handleStreaming(message: string, session_id: string): Promise<Res
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleSonnetStream(message: string, session_id: string): Promise<Response> {
+    const startTime = Date.now();
     const ctx = await buildContext(message, session_id);
     const { messages, systemBlock, cleanHistory, userMessage, roundCount } = ctx;
 
@@ -277,6 +286,7 @@ async function handleSonnetStream(message: string, session_id: string): Promise<
                 });
 
                 let fullText = '';
+                let outputTokenCount: number | null = null;
                 for await (const chunk of streamResp) {
                     if (
                         chunk.type === 'content_block_delta' &&
@@ -285,14 +295,17 @@ async function handleSonnetStream(message: string, session_id: string): Promise<
                         const text = (chunk.delta as any).text as string;
                         fullText += text;
                         send('token', JSON.stringify({ text }));
+                    } else if (chunk.type === 'message_delta' && (chunk as any).usage) {
+                        outputTokenCount = (chunk as any).usage.output_tokens ?? null;
                     }
                 }
 
+                const serverLatencyMs = Date.now() - startTime;
                 console.log('[sonnet-stream] reply length:', fullText.length);
 
                 if (fullText) {
                     const newRoundCount = await saveToDb(session_id, cleanHistory, userMessage, fullText, roundCount);
-                    send('done', JSON.stringify({ session_id, round_count: newRoundCount }));
+                    send('done', JSON.stringify({ session_id, round_count: newRoundCount, server_latency_ms: serverLatencyMs, output_token_count: outputTokenCount, prompt_version: PROMPT_VERSION }));
                 } else {
                     send('error', JSON.stringify({ message: 'Empty response from Claude' }));
                 }
@@ -319,6 +332,7 @@ async function handleSonnetStream(message: string, session_id: string): Promise<
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleOriginal(message: string, session_id: string): Promise<Response> {
+    const startTime = Date.now();
     await initDb();
 
     let session = await sql`SELECT round_count, conversation_history FROM sessions WHERE id = ${session_id}`;
@@ -422,6 +436,9 @@ async function handleOriginal(message: string, session_id: string): Promise<Resp
         .map((b: any) => b.text)
         .join('');
 
+    const serverLatencyMs = Date.now() - startTime;
+    const outputTokenCount: number | null = (response.usage as any)?.output_tokens ?? null;
+
     console.log('[chat] final reply length:', assistantReply.length);
 
     if (!assistantReply) {
@@ -436,7 +453,7 @@ async function handleOriginal(message: string, session_id: string): Promise<Resp
         UPDATE sessions SET round_count = ${newRoundCount}, conversation_history = ${JSON.stringify(savedHistory)} WHERE id = ${session_id}
     `;
 
-    return NextResponse.json({ reply: assistantReply, session_id, round_count: newRoundCount });
+    return NextResponse.json({ reply: assistantReply, session_id, round_count: newRoundCount, server_latency_ms: serverLatencyMs, output_token_count: outputTokenCount, prompt_version: PROMPT_VERSION });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -16,11 +16,19 @@ type Message = {
   content: string
 }
 
+type MessageTelemetry = {
+  clientLatencyMs?: number | null
+  serverLatencyMs?: number | null
+  outputTokenCount?: number | null
+  promptVersion?: string | null
+}
+
 type FeedbackDialogState = {
   open: boolean
   messageId: string
   index: number
   messageContent: string
+  telemetry?: MessageTelemetry
 }
 
 const LATENCY_MODE = "sonnet-stream"
@@ -34,6 +42,7 @@ export function Chatbot() {
   const [streamPhase, setStreamPhase] = useState<"thinking" | "fetching" | "responding" | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialogState | null>(null)
+  const [messageTelemetry, setMessageTelemetry] = useState<Record<string, MessageTelemetry>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -56,6 +65,8 @@ export function Chatbot() {
 
     if (!newRating) return
 
+    const telemetry = messageTelemetry[messageId] ?? {}
+
     if (newRating === "down") {
       // Open feedback dialog instead of immediately posting
       setFeedbackDialog({
@@ -63,6 +74,7 @@ export function Chatbot() {
         messageId,
         index,
         messageContent: messageContent ?? "",
+        telemetry,
       })
       return
     }
@@ -77,6 +89,10 @@ export function Chatbot() {
           message_index: index,
           message_content: messageContent ?? null,
           rating: "thumbs_up",
+          server_latency_ms: telemetry.serverLatencyMs ?? null,
+          client_latency_ms: telemetry.clientLatencyMs ?? null,
+          output_token_count: telemetry.outputTokenCount ?? null,
+          prompt_version: telemetry.promptVersion ?? null,
         }),
       })
     } catch (err) {
@@ -86,7 +102,7 @@ export function Chatbot() {
 
   async function handleFeedbackSubmit(reason: string | null, feedbackText: string) {
     if (!feedbackDialog || !sessionId) return
-    const { messageId, index, messageContent } = feedbackDialog
+    const { messageId, index, messageContent, telemetry = {} } = feedbackDialog
     setFeedbackDialog(null)
 
     try {
@@ -100,6 +116,10 @@ export function Chatbot() {
           rating: "thumbs_down",
           reason: reason,
           feedback_text: feedbackText || null,
+          server_latency_ms: telemetry.serverLatencyMs ?? null,
+          client_latency_ms: telemetry.clientLatencyMs ?? null,
+          output_token_count: telemetry.outputTokenCount ?? null,
+          prompt_version: telemetry.promptVersion ?? null,
         }),
       })
     } catch (err) {
@@ -117,7 +137,7 @@ export function Chatbot() {
     setFeedbackDialog(null)
   }
 
-  async function handleStreamingSubmit(userInput: string) {
+  async function handleStreamingSubmit(userInput: string, sendTime: number) {
     const response = await fetch(`/api/chat?mode=${LATENCY_MODE}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -152,14 +172,25 @@ export function Chatbot() {
               accumulated += parsed.text
               setStreamingText(accumulated)
             } else if (parsed.session_id) {
+              const renderTime = Date.now()
+              const msgId = (Date.now() + 1).toString()
               const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
+                id: msgId,
                 role: "assistant",
                 content: accumulated,
               }
               setMessages((prev) => [...prev, assistantMessage])
               setStreamingText("")
               setStreamPhase(null)
+              setMessageTelemetry((prev) => ({
+                ...prev,
+                [msgId]: {
+                  clientLatencyMs: renderTime - sendTime,
+                  serverLatencyMs: parsed.server_latency_ms ?? null,
+                  outputTokenCount: parsed.output_token_count ?? null,
+                  promptVersion: parsed.prompt_version ?? null,
+                },
+              }))
             } else if (parsed.message) {
               throw new Error(parsed.message)
             }
@@ -173,7 +204,7 @@ export function Chatbot() {
     return accumulated
   }
 
-  async function handleJsonSubmit(userInput: string) {
+  async function handleJsonSubmit(userInput: string, sendTime: number) {
     const response = await fetch(`/api/chat?mode=${LATENCY_MODE}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -183,12 +214,23 @@ export function Chatbot() {
     const data = await response.json()
 
     if (data.reply) {
+      const renderTime = Date.now()
+      const msgId = (Date.now() + 1).toString()
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: msgId,
         role: "assistant",
         content: data.reply,
       }
       setMessages((prev) => [...prev, assistantMessage])
+      setMessageTelemetry((prev) => ({
+        ...prev,
+        [msgId]: {
+          clientLatencyMs: renderTime - sendTime,
+          serverLatencyMs: data.server_latency_ms ?? null,
+          outputTokenCount: data.output_token_count ?? null,
+          promptVersion: data.prompt_version ?? null,
+        },
+      }))
     } else {
       throw new Error(data.error || "Failed to get reply")
     }
@@ -208,12 +250,13 @@ export function Chatbot() {
     const userInput = input
     setInput("")
     setIsLoading(true)
+    const sendTime = Date.now()
 
     try {
       if (LATENCY_MODE === "stream" || LATENCY_MODE === "sonnet-stream") {
-        await handleStreamingSubmit(userInput)
+        await handleStreamingSubmit(userInput, sendTime)
       } else {
-        await handleJsonSubmit(userInput)
+        await handleJsonSubmit(userInput, sendTime)
       }
     } catch (err) {
       console.error("Chat error:", err)
@@ -290,7 +333,7 @@ export function Chatbot() {
                 {/* Thumbs Up / Down for opening message */}
                 <div className="mt-1.5 flex items-center gap-1 px-1">
                   <button
-                    onClick={() => handleRate("opening-message", "up")}
+                    onClick={() => handleRate("opening-message", "up", -1, PERSONAL_INFO.proxie.greeting)}
                     className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings["opening-message"] === "up"
                       ? "bg-primary/15 text-primary"
                       : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
@@ -300,7 +343,7 @@ export function Chatbot() {
                     <ThumbsUp className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => handleRate("opening-message", "down")}
+                    onClick={() => handleRate("opening-message", "down", -1, PERSONAL_INFO.proxie.greeting)}
                     className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${ratings["opening-message"] === "down"
                       ? "bg-destructive/15 text-destructive"
                       : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
