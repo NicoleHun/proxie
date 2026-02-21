@@ -227,7 +227,10 @@ async function handleSonnetStream(message: string, session_id: string): Promise<
                     messages,
                 });
 
-                while (response.stop_reason === 'tool_use') {
+                // Single tool-use round: fetch docs in parallel, then go straight
+                // to streaming — skips the expensive 2nd non-streaming Sonnet call
+                // that previously just confirmed stop_reason === 'end_turn' (~5s).
+                if (response.stop_reason === 'tool_use') {
                     const assistantContent = response.content;
                     const toolUseBlocks = assistantContent.filter((b: any) => b.type === 'tool_use');
 
@@ -258,14 +261,6 @@ async function handleSonnetStream(message: string, session_id: string): Promise<
 
                     messages.push({ role: 'assistant', content: assistantContent });
                     messages.push({ role: 'user', content: toolResults });
-
-                    response = await anthropic.messages.create({
-                        model: RESPONSE_MODEL,
-                        max_tokens: 150,
-                        system: [systemBlock],
-                        tools: KB_TOOLS as any,
-                        messages,
-                    });
                 }
 
                 // Phase 2: Sonnet streams the final reply
