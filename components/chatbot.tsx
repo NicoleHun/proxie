@@ -51,7 +51,10 @@ export function Chatbot() {
   }, [])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (!messagesEndRef.current) return
+    // Avoid auto-scrolling the whole page on initial load
+    if (messages.length === 0 && !streamingText) return
+    messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
   }, [messages, streamingText])
 
   async function handleRate(messageId: string, rating: Rating, index?: number, messageContent?: string) {
@@ -277,8 +280,8 @@ export function Chatbot() {
   const phaseLabel = streamPhase === "fetching"
     ? "Looking up Nicole's info..."
     : streamPhase === "thinking"
-    ? "Thinking..."
-    : null
+      ? "Thinking..."
+      : null
 
   return (
     <section className="px-6 py-10">
@@ -396,11 +399,10 @@ export function Chatbot() {
 
                       {/* Message Bubble */}
                       <div
-                        className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 ${
-                          isUser
-                            ? "rounded-br-md bg-primary text-primary-foreground prose-headings:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground prose-a:text-primary-foreground"
-                            : "rounded-bl-md bg-secondary text-secondary-foreground prose-headings:text-secondary-foreground prose-strong:text-secondary-foreground prose-code:text-secondary-foreground prose-a:text-secondary-foreground"
-                        }`}
+                        className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed prose prose-sm prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 ${isUser
+                          ? "rounded-br-md bg-primary text-primary-foreground prose-headings:text-primary-foreground prose-strong:text-primary-foreground prose-code:text-primary-foreground prose-a:text-primary-foreground"
+                          : "rounded-bl-md bg-secondary text-secondary-foreground prose-headings:text-secondary-foreground prose-strong:text-secondary-foreground prose-code:text-secondary-foreground prose-a:text-secondary-foreground"
+                          }`}
                         style={{ wordBreak: 'normal', overflowWrap: 'break-word', whiteSpace: 'normal' }}
                       >
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
