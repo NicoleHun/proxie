@@ -84,7 +84,7 @@ export function Chatbot() {
 
     // Thumbs up: post immediately
     try {
-      await fetch("/api/rating", {
+      const res = await fetch("/api/rating", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -98,6 +98,10 @@ export function Chatbot() {
           prompt_version: telemetry.promptVersion ?? null,
         }),
       })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        console.error("Rating API error:", res.status, body)
+      }
     } catch (err) {
       console.error("Failed to submit rating:", err)
     }
@@ -109,7 +113,7 @@ export function Chatbot() {
     setFeedbackDialog(null)
 
     try {
-      await fetch("/api/rating", {
+      const res = await fetch("/api/rating", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -125,6 +129,10 @@ export function Chatbot() {
           prompt_version: telemetry.promptVersion ?? null,
         }),
       })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        console.error("Rating API error:", res.status, body)
+      }
     } catch (err) {
       console.error("Failed to submit rating:", err)
     }

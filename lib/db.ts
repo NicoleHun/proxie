@@ -41,6 +41,10 @@ export async function initDb() {
     );
   `;
 
+  // Migrate existing tables: widen rating column from VARCHAR(10) to TEXT
+  // (thumbs_down is 11 chars and was being rejected by the old VARCHAR(10) constraint)
+  await sql`ALTER TABLE ratings ALTER COLUMN rating TYPE TEXT`;
+
   // Migrate existing tables to add new columns if they don't exist
   await sql`ALTER TABLE ratings ADD COLUMN IF NOT EXISTS message_content TEXT`;
   await sql`ALTER TABLE ratings ADD COLUMN IF NOT EXISTS reason TEXT`;
@@ -50,30 +54,6 @@ export async function initDb() {
   await sql`ALTER TABLE ratings ADD COLUMN IF NOT EXISTS output_token_count INTEGER`;
   await sql`ALTER TABLE ratings ADD COLUMN IF NOT EXISTS prompt_version TEXT`;
 
-  // Add reason CHECK constraint for existing installs.
-  // NOT VALID skips validation of pre-existing rows that may contain old free-text values.
-  await sql`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'ratings_reason_check'
-          AND conrelid = 'ratings'::regclass
-      ) THEN
-        ALTER TABLE ratings
-          ADD CONSTRAINT ratings_reason_check
-          CHECK (
-            reason IS NULL OR reason IN (
-              'UI Issue',
-              'Lack of fluency and poorly articulated',
-              'Didn''t fully follow my request',
-              'I don''t like the tone',
-              'Others'
-            )
-          ) NOT VALID;
-      END IF;
-    END $$;
-  `;
 }
 
 export default sql;
