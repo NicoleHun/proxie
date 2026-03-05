@@ -1,107 +1,150 @@
 "use client"
 
 import Image from "next/image"
-import { Linkedin, Mail, Copy, Check } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { PERSONAL_INFO } from "@/lib/constants"
 
 export function HeroSection() {
-  const [showEmailPopup, setShowEmailPopup] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const popupRef = useRef<HTMLDivElement>(null)
-
-  const handleCopyEmail = async () => {
-    await navigator.clipboard.writeText(PERSONAL_INFO.email)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        popupRef.current &&
-        !popupRef.current.contains(event.target as Node)
-      ) {
-        setShowEmailPopup(false)
-      }
-    }
+    const t = setTimeout(() => setVisible(true), 80)
+    return () => clearTimeout(t)
+  }, [])
 
-    if (showEmailPopup) {
-      document.addEventListener("mousedown", handleClickOutside)
-      return () => document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [showEmailPopup])
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })
+  }
+
   return (
-    <section className="flex flex-col items-center gap-10 px-6 py-16 md:flex-row md:items-start md:gap-16">
-      {/* Profile Picture */}
-      <div className="flex-shrink-0">
-        <div className="relative h-52 w-44 overflow-hidden rounded-[50%] border-4 border-primary/20 shadow-lg md:h-64 md:w-52">
-          <Image
-            src="/images/profile.jpg"
-            alt="Nicole's profile photo"
-            fill
-            sizes="(max-width: 768px) 176px, 208px"
-            className="object-cover"
-            priority
-          />
-        </div>
-      </div>
-
-      {/* Summary */}
-      <div className="flex flex-col gap-4 text-center md:text-left">
-        <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground md:text-4xl text-balance">
-          {`Hi, I'm ${PERSONAL_INFO.name}!`}
-        </h1>
-
-        <p className="text-lg leading-relaxed text-muted-foreground text-pretty">
-          {PERSONAL_INFO.bio.intro}
-        </p>
-
-        <p className="text-base leading-relaxed text-muted-foreground text-pretty">
-          {PERSONAL_INFO.bio.closing}
-        </p>
-
-        {/* Social Links */}
-        <div className="flex items-center justify-center gap-4 md:justify-start">
-          <a
-            href={PERSONAL_INFO.linkedin}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
-            aria-label="LinkedIn profile"
+    <section
+      style={{
+        maxWidth: "660px",
+        margin: "0 auto",
+        padding: "120px 24px 96px",
+        opacity: visible ? 1 : 0,
+        transform: visible ? "none" : "translateY(20px)",
+        transition: "opacity 0.6s ease, transform 0.6s ease",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          gap: "40px",
+          alignItems: "flex-start",
+        }}
+      >
+        {/* Profile photo */}
+        <div style={{ flexShrink: 0 }}>
+          <div
+            style={{
+              position: "relative",
+              width: "160px",
+              height: "192px",
+              borderRadius: "50%",
+              overflow: "hidden",
+              border: "2px solid #e8e6e0",
+            }}
           >
-            <Linkedin className="h-4 w-4" />
-            <span>LinkedIn</span>
-          </a>
-          <div ref={popupRef} className="relative">
-            <button
-              onClick={() => setShowEmailPopup(!showEmailPopup)}
-              className="flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
-              aria-label="Show email"
-            >
-              <Mail className="h-4 w-4" />
-              <span>Email</span>
-            </button>
+            <Image
+              src="/images/profile-illustration.png"
+              alt="Nicole's profile illustration"
+              fill
+              sizes="160px"
+              className="object-cover"
+              priority
+            />
+          </div>
+        </div>
 
-            {/* Email Popup */}
-            {showEmailPopup && (
-              <div className="absolute left-0 top-12 z-10 flex items-center gap-2 rounded-lg border border-border bg-card p-3 shadow-lg">
-                <span className="text-sm text-foreground">
-                  {PERSONAL_INFO.email}
-                </span>
-                <button
-                  onClick={handleCopyEmail}
-                  className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-secondary"
-                  aria-label="Copy email"
-                >
-                  {copied ? (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                </button>
-              </div>
-            )}
+        {/* Text */}
+        <div style={{ flex: 1, paddingTop: "4px" }}>
+          <p
+            style={{
+              fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+              fontSize: "10px",
+              color: "#aaa",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              marginBottom: "16px",
+            }}
+          >
+            Program, Product &amp; Builder · AI / Autonomous Systems
+          </p>
+
+          <h1
+            style={{
+              fontFamily: "var(--font-eb-garamond), 'EB Garamond', serif",
+              fontSize: "clamp(32px, 5vw, 44px)",
+              fontWeight: "400",
+              color: "#111",
+              lineHeight: "1.15",
+              letterSpacing: "-0.02em",
+              marginBottom: "16px",
+            }}
+          >
+            {`Hi, I'm ${PERSONAL_INFO.name}.`}
+          </h1>
+
+          <p
+            style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: "15px",
+              lineHeight: "1.8",
+              color: "#888",
+              fontWeight: "300",
+              marginBottom: "28px",
+            }}
+          >
+            9 years of managing complex systems and building random AI things on weekends.
+          </p>
+
+          <div style={{ display: "flex", gap: "20px", alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={() => scrollTo("projects")}
+              style={{
+                background: "#111",
+                color: "#fafaf8",
+                border: "none",
+                padding: "10px 22px",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: "500",
+                cursor: "pointer",
+              }}
+            >
+              See my work →
+            </button>
+            <a
+              href={`mailto:${PERSONAL_INFO.email}`}
+              style={{
+                fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+                fontSize: "10px",
+                color: "#aaa",
+                textTransform: "uppercase",
+                letterSpacing: "0.07em",
+                textDecoration: "none",
+              }}
+            >
+              Get in touch ↗
+            </a>
+            <a
+              href={PERSONAL_INFO.linkedin}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+                fontSize: "10px",
+                color: "#aaa",
+                textTransform: "uppercase",
+                letterSpacing: "0.07em",
+                textDecoration: "none",
+              }}
+            >
+              LinkedIn ↗
+            </a>
           </div>
         </div>
       </div>
