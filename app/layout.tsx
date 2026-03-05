@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { DM_Sans, Lora } from 'next/font/google'
+import { DM_Sans, EB_Garamond, DM_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
@@ -9,9 +9,17 @@ const dmSans = DM_Sans({
   variable: '--font-dm-sans',
 })
 
-const lora = Lora({
+const ebGaramond = EB_Garamond({
   subsets: ['latin'],
-  variable: '--font-lora',
+  variable: '--font-eb-garamond',
+  style: ['normal', 'italic'],
+  weight: ['400', '500'],
+})
+
+const dmMono = DM_Mono({
+  subsets: ['latin'],
+  variable: '--font-dm-mono',
+  weight: ['300', '400', '500'],
 })
 
 export const metadata: Metadata = {
@@ -37,7 +45,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#EDE8E1',
+  themeColor: '#fafaf8',
 }
 
 export default function RootLayout({
@@ -46,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${lora.variable}`}>
+    <html lang="en" className={`${dmSans.variable} ${ebGaramond.variable} ${dmMono.variable}`}>
       <body className="font-sans antialiased">
         {children}
         <Analytics />
