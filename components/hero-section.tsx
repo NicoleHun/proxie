@@ -40,8 +40,8 @@ export function HeroSection() {
           <div
             style={{
               position: "relative",
-              width: "160px",
-              height: "192px",
+              width: "194px",
+              height: "232px",
               borderRadius: "50%",
               overflow: "hidden",
               border: "2px solid #e8e6e0",
@@ -51,7 +51,7 @@ export function HeroSection() {
               src="/images/profile-illustration.png"
               alt="Nicole's profile illustration"
               fill
-              sizes="160px"
+              sizes="194px"
               className="object-cover"
               priority
             />

@@ -619,7 +619,7 @@ export function ProxieFAB() {
                 whiteSpace: "nowrap",
               }}
             >
-              Ask Proxie
+              Ask Proxie - Nicole's Digital Twin
             </span>
             <div style={{ display: "flex", gap: "3px", alignItems: "center" }}>
               {[0, 1, 2].map((i) => (
