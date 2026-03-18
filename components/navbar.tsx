@@ -106,6 +106,28 @@ export function Navbar() {
           >
             LinkedIn ↗
           </a>
+          <a
+            href="https://github.com/NicoleHun"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+              fontSize: "10px",
+              color: "#aaa",
+              textTransform: "uppercase",
+              letterSpacing: "0.07em",
+              textDecoration: "none",
+              transition: "color 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              ;(e.currentTarget as HTMLElement).style.color = "#111"
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLElement).style.color = "#aaa"
+            }}
+          >
+            GitHub ↗
+          </a>
         </div>
       </nav>
     </header>
