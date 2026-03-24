@@ -14,37 +14,34 @@ export function Navbar() {
 
   useEffect(() => {
     const onScroll = () => {
-      setScrolled(window.scrollY > 20)
-      // Activate writing when its section enters the viewport
-      const writing = document.getElementById("writing")
-      if (writing) {
-        const top = writing.getBoundingClientRect().top
-        if (top < window.innerHeight * 0.9) {
-          setActive("writing")
-          return
+      const scrollY = window.scrollY
+      const vh = window.innerHeight
+      const scrollHeight = document.documentElement.scrollHeight
+
+      setScrolled(scrollY > 20)
+
+      // Near bottom of page → activate writing (only if page is tall enough)
+      if (scrollHeight > vh && scrollY + vh >= scrollHeight - 60) {
+        setActive("writing")
+        return
+      }
+
+      // Find the last section whose top has scrolled above 60% of the viewport
+      let newActive: string | null = null
+      for (const [id] of NAV_LINKS) {
+        const el = document.getElementById(id)
+        if (!el) continue
+        const top = el.getBoundingClientRect().top
+        if (top < vh * 0.6 && top < vh) {
+          newActive = id
         }
       }
+      setActive(newActive)
     }
-    window.addEventListener("scroll", onScroll)
 
-    const observers: IntersectionObserver[] = []
-    NAV_LINKS.filter(([id]) => id !== "writing").forEach(([id]) => {
-      const el = document.getElementById(id)
-      if (!el) return
-      const obs = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) setActive(id)
-        },
-        { rootMargin: "-10% 0px -40% 0px", threshold: 0 }
-      )
-      obs.observe(el)
-      observers.push(obs)
-    })
-
-    return () => {
-      window.removeEventListener("scroll", onScroll)
-      observers.forEach((o) => o.disconnect())
-    }
+    window.addEventListener("scroll", onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
   const scrollTo = (id: string) => {
