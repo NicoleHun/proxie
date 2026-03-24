@@ -10,11 +10,41 @@ const NAV_LINKS: [string, string][] = [
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
+  const [active, setActive] = useState<string | null>(null)
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20)
+    const onScroll = () => {
+      setScrolled(window.scrollY > 20)
+      // Activate writing when its section enters the viewport
+      const writing = document.getElementById("writing")
+      if (writing) {
+        const top = writing.getBoundingClientRect().top
+        if (top < window.innerHeight * 0.9) {
+          setActive("writing")
+          return
+        }
+      }
+    }
     window.addEventListener("scroll", onScroll)
-    return () => window.removeEventListener("scroll", onScroll)
+
+    const observers: IntersectionObserver[] = []
+    NAV_LINKS.filter(([id]) => id !== "writing").forEach(([id]) => {
+      const el = document.getElementById(id)
+      if (!el) return
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) setActive(id)
+        },
+        { rootMargin: "-10% 0px -40% 0px", threshold: 0 }
+      )
+      obs.observe(el)
+      observers.push(obs)
+    })
+
+    return () => {
+      window.removeEventListener("scroll", onScroll)
+      observers.forEach((o) => o.disconnect())
+    }
   }, [])
 
   const scrollTo = (id: string) => {
@@ -33,7 +63,7 @@ export function Navbar() {
     >
       <nav
         style={{
-          maxWidth: "660px",
+          maxWidth: "860px",
           margin: "0 auto",
           padding: "0 24px",
           display: "flex",
@@ -63,71 +93,32 @@ export function Navbar() {
               key={id}
               onClick={() => scrollTo(id)}
               style={{
-                background: "none",
+                background: active === id ? "#111" : "none",
                 border: "none",
                 fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
                 fontSize: "10px",
-                color: "#aaa",
+                color: active === id ? "#fafaf8" : "#aaa",
                 cursor: "pointer",
                 textTransform: "uppercase",
                 letterSpacing: "0.07em",
-                padding: 0,
-                transition: "color 0.15s ease",
+                padding: active === id ? "4px 10px" : "4px 10px",
+                borderRadius: "999px",
+                transition: "background 0.2s ease, color 0.2s ease",
               }}
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLElement).style.color = "#111"
+                if (active !== id) {
+                  ;(e.currentTarget as HTMLElement).style.color = "#111"
+                }
               }}
               onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLElement).style.color = "#aaa"
+                if (active !== id) {
+                  ;(e.currentTarget as HTMLElement).style.color = "#aaa"
+                }
               }}
             >
               {label}
             </button>
           ))}
-          <a
-            href="https://www.linkedin.com/in/zheng-nicole-huang"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-              fontSize: "10px",
-              color: "#aaa",
-              textTransform: "uppercase",
-              letterSpacing: "0.07em",
-              textDecoration: "none",
-              transition: "color 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLElement).style.color = "#111"
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLElement).style.color = "#aaa"
-            }}
-          >
-            LinkedIn ↗
-          </a>
-          <a
-            href="https://github.com/NicoleHun"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-              fontSize: "10px",
-              color: "#aaa",
-              textTransform: "uppercase",
-              letterSpacing: "0.07em",
-              textDecoration: "none",
-              transition: "color 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLElement).style.color = "#111"
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLElement).style.color = "#aaa"
-            }}
-          >
-            GitHub ↗
-          </a>
         </div>
       </nav>
     </header>

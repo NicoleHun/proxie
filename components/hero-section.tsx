@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import { useState, useEffect } from "react"
+import { Github, Mail, Linkedin } from "lucide-react"
 import { PERSONAL_INFO } from "@/lib/constants"
 
 export function HeroSection() {
@@ -19,9 +20,9 @@ export function HeroSection() {
   return (
     <section
       style={{
-        maxWidth: "660px",
+        maxWidth: "860px",
         margin: "0 auto",
-        padding: "120px 24px 96px",
+        padding: "120px 24px 40px",
         opacity: visible ? 1 : 0,
         transform: visible ? "none" : "translateY(20px)",
         transition: "opacity 0.6s ease, transform 0.6s ease",
@@ -40,18 +41,17 @@ export function HeroSection() {
           <div
             style={{
               position: "relative",
-              width: "194px",
-              height: "232px",
+              width: "280px",
+              height: "280px",
               borderRadius: "50%",
               overflow: "hidden",
-              border: "2px solid #e8e6e0",
             }}
           >
             <Image
               src="/images/profile-illustration.png"
               alt="Nicole's profile illustration"
               fill
-              sizes="194px"
+              sizes="280px"
               className="object-cover"
               priority
             />
@@ -63,8 +63,8 @@ export function HeroSection() {
           <p
             style={{
               fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-              fontSize: "10px",
-              color: "#aaa",
+              fontSize: "12px",
+              color: "#555",
               textTransform: "uppercase",
               letterSpacing: "0.1em",
               marginBottom: "16px",
@@ -92,7 +92,7 @@ export function HeroSection() {
               fontFamily: "'DM Sans', sans-serif",
               fontSize: "15px",
               lineHeight: "1.8",
-              color: "#888",
+              color: "#555",
               fontWeight: "300",
               marginBottom: "28px",
             }}
@@ -117,34 +117,70 @@ export function HeroSection() {
             >
               See my work →
             </button>
-            <a
-              href={`mailto:${PERSONAL_INFO.email}`}
-              style={{
-                fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-                fontSize: "10px",
-                color: "#aaa",
-                textTransform: "uppercase",
-                letterSpacing: "0.07em",
-                textDecoration: "none",
-              }}
-            >
-              Get in touch ↗
-            </a>
-            <a
-              href={PERSONAL_INFO.linkedin}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-                fontSize: "10px",
-                color: "#aaa",
-                textTransform: "uppercase",
-                letterSpacing: "0.07em",
-                textDecoration: "none",
-              }}
-            >
-              LinkedIn ↗
-            </a>
+            <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+              <a
+                href={`mailto:${PERSONAL_INFO.email}`}
+                style={{
+                  fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+                  fontSize: "12px",
+                  color: "#555",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.07em",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                }}
+              >
+                <Mail size={12} />
+                Get in touch ↗
+              </a>
+              <a
+                href={PERSONAL_INFO.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+                  fontSize: "12px",
+                  color: "#555",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.07em",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                }}
+              >
+                <Linkedin size={12} />
+                LinkedIn ↗
+              </a>
+              <a
+                href={PERSONAL_INFO.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+                  fontSize: "12px",
+                  color: "#555",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.07em",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  transition: "color 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.color = "#111"
+                }}
+                onMouseLeave={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.color = "#555"
+                }}
+              >
+                <Github size={12} />
+                GitHub ↗
+              </a>
+            </div>
           </div>
         </div>
       </div>

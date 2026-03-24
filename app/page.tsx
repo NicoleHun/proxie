@@ -18,7 +18,7 @@ export default function Home() {
         <section
           id="writing"
           style={{
-            maxWidth: "660px",
+            maxWidth: "860px",
             margin: "0 auto",
             padding: "0 24px 120px",
           }}
@@ -26,41 +26,60 @@ export default function Home() {
           <p
             style={{
               fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-              fontSize: "10px",
-              color: "#aaa",
+              fontSize: "11px",
+              color: "#111",
               textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              marginBottom: "24px",
+              letterSpacing: "0.12em",
+              marginBottom: "32px",
+              borderLeft: "3px solid #111",
+              paddingLeft: "12px",
             }}
           >
             Writing
           </p>
-          <div
+          <a
+            href="https://medium.com/p/95ca87c24ab2"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block transition-opacity hover:opacity-60"
             style={{
               borderTop: "1px solid #e8e6e0",
               padding: "22px 0",
               borderBottom: "1px solid #e8e6e0",
+              textDecoration: "none",
+              color: "inherit",
             }}
           >
             <p
               style={{
                 fontFamily: "var(--font-eb-garamond), 'EB Garamond', serif",
-                fontStyle: "italic",
-                fontSize: "16px",
-                color: "#bbb",
-                margin: 0,
+                fontSize: "18px",
+                color: "#111",
+                margin: "0 0 6px",
+                lineHeight: "1.4",
               }}
             >
-              Product teardowns and AI tool deep dives — coming soon.
+              I Ran Non-Fine-Tuned Open Source Models Against Real User Complaints. Here&apos;s What Broke.
             </p>
-          </div>
+            <span
+              style={{
+                fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+                fontSize: "12px",
+                color: "#555",
+                textTransform: "uppercase",
+                letterSpacing: "0.07em",
+              }}
+            >
+              Medium ↗
+            </span>
+          </a>
         </section>
       </main>
 
       {/* Footer */}
       <footer
         style={{
-          maxWidth: "660px",
+          maxWidth: "860px",
           margin: "0 auto",
           padding: "24px 24px 48px",
           display: "flex",

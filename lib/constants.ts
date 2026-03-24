@@ -3,6 +3,7 @@ export const PERSONAL_INFO = {
 	fullName: "Nicole Huang",
 	email: "nicolefanyu@gmail.com",
 	linkedin: "https://www.linkedin.com/in/zheng-nicole-huang",
+	github: "https://github.com/NicoleHun",
 	title: "Engineer & Program Lead",
 	bio: {
 		intro:
