@@ -10,10 +10,37 @@ const NAV_LINKS: [string, string][] = [
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
+  const [active, setActive] = useState<string | null>(null)
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20)
-    window.addEventListener("scroll", onScroll)
+    const onScroll = () => {
+      const scrollY = window.scrollY
+      const vh = window.innerHeight
+      const scrollHeight = document.documentElement.scrollHeight
+
+      setScrolled(scrollY > 20)
+
+      // Near bottom of page → activate writing (only if page is tall enough)
+      if (scrollHeight > vh && scrollY + vh >= scrollHeight - 60) {
+        setActive("writing")
+        return
+      }
+
+      // Find the last section whose top has scrolled above 60% of the viewport
+      let newActive: string | null = null
+      for (const [id] of NAV_LINKS) {
+        const el = document.getElementById(id)
+        if (!el) continue
+        const top = el.getBoundingClientRect().top
+        if (top < vh * 0.6 && top < vh) {
+          newActive = id
+        }
+      }
+      setActive(newActive)
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    onScroll()
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
@@ -33,7 +60,7 @@ export function Navbar() {
     >
       <nav
         style={{
-          maxWidth: "660px",
+          maxWidth: "860px",
           margin: "0 auto",
           padding: "0 24px",
           display: "flex",
@@ -63,71 +90,32 @@ export function Navbar() {
               key={id}
               onClick={() => scrollTo(id)}
               style={{
-                background: "none",
+                background: active === id ? "#111" : "none",
                 border: "none",
                 fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
                 fontSize: "10px",
-                color: "#aaa",
+                color: active === id ? "#fafaf8" : "#aaa",
                 cursor: "pointer",
                 textTransform: "uppercase",
                 letterSpacing: "0.07em",
-                padding: 0,
-                transition: "color 0.15s ease",
+                padding: active === id ? "4px 10px" : "4px 10px",
+                borderRadius: "999px",
+                transition: "background 0.2s ease, color 0.2s ease",
               }}
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLElement).style.color = "#111"
+                if (active !== id) {
+                  ;(e.currentTarget as HTMLElement).style.color = "#111"
+                }
               }}
               onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLElement).style.color = "#aaa"
+                if (active !== id) {
+                  ;(e.currentTarget as HTMLElement).style.color = "#aaa"
+                }
               }}
             >
               {label}
             </button>
           ))}
-          <a
-            href="https://www.linkedin.com/in/zheng-nicole-huang"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-              fontSize: "10px",
-              color: "#aaa",
-              textTransform: "uppercase",
-              letterSpacing: "0.07em",
-              textDecoration: "none",
-              transition: "color 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLElement).style.color = "#111"
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLElement).style.color = "#aaa"
-            }}
-          >
-            LinkedIn ↗
-          </a>
-          <a
-            href="https://github.com/NicoleHun"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-              fontSize: "10px",
-              color: "#aaa",
-              textTransform: "uppercase",
-              letterSpacing: "0.07em",
-              textDecoration: "none",
-              transition: "color 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLElement).style.color = "#111"
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLElement).style.color = "#aaa"
-            }}
-          >
-            GitHub ↗
-          </a>
         </div>
       </nav>
     </header>

@@ -165,8 +165,8 @@ function BloomDemo() {
         <span
           style={{
             fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-            fontSize: "10px",
-            color: "#aaa",
+            fontSize: "11px",
+            color: "#555",
             letterSpacing: "0.05em",
           }}
         >
@@ -176,8 +176,8 @@ function BloomDemo() {
           onClick={reset}
           style={{
             fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-            fontSize: "10px",
-            color: "#bbb",
+            fontSize: "11px",
+            color: "#555",
             background: "none",
             border: "none",
             cursor: "pointer",
@@ -217,8 +217,8 @@ function BloomDemo() {
         <span
           style={{
             fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-            fontSize: "10px",
-            color: "#aaa",
+            fontSize: "11px",
+            color: "#555",
             marginLeft: "8px",
           }}
         >
@@ -240,8 +240,8 @@ function BloomDemo() {
             <span
               style={{
                 fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-                fontSize: "10px",
-                color: "#888",
+                fontSize: "11px",
+                color: "#555",
                 textTransform: "uppercase",
                 letterSpacing: "0.07em",
               }}
@@ -286,8 +286,8 @@ function BloomDemo() {
                   <span
                     style={{
                       fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-                      fontSize: "9px",
-                      color: "#aaa",
+                      fontSize: "11px",
+                      color: "#555",
                       textTransform: "uppercase",
                       letterSpacing: "0.07em",
                       minWidth: "60px",
@@ -495,8 +495,8 @@ function ProjectCard({ project, index }: { project: (typeof projects)[0]; index:
               <span
                 style={{
                   fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-                  fontSize: "9px",
-                  color: "#bbb",
+                  fontSize: "11px",
+                  color: "#555",
                   textTransform: "uppercase",
                   letterSpacing: "0.07em",
                 }}
@@ -632,6 +632,36 @@ function ProjectCard({ project, index }: { project: (typeof projects)[0]; index:
                   Screenshots
                 </div>
                 <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+                  <div style={{ flex: "3", minWidth: 0 }}>
+                    <div style={{ overflow: "hidden", borderRadius: "8px", border: "1px solid #e4e2dc", height: "160px" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/images/bloom-unit-demo.png" alt="Bloom Unit dashboard" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
+                    </div>
+                    <p style={{ fontFamily: "var(--font-dm-mono), 'DM Mono', monospace", fontSize: "9px", color: "#bbb", marginTop: "5px", letterSpacing: "0.04em" }}>Web dashboard</p>
+                  </div>
+                  <div style={{ flex: "2", minWidth: 0 }}>
+                    <div style={{ overflow: "hidden", borderRadius: "8px", border: "1px solid #e4e2dc", height: "160px" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/images/bloom-unit-telegram.png" alt="IdeaSprout Telegram bot" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
+                    </div>
+                    <p style={{ fontFamily: "var(--font-dm-mono), 'DM Mono', monospace", fontSize: "9px", color: "#bbb", marginTop: "5px", letterSpacing: "0.04em" }}>IdeaSprout · Telegram bot</p>
+                  </div>
+                </div>
+
+                {/* Interactive demo */}
+                <div
+                  style={{
+                    fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+                    fontSize: "10px",
+                    color: "#aaa",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.07em",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Screenshots
+                </div>
+                <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
                   {/* Dashboard screenshot */}
                   <div style={{ flex: "3", minWidth: 0 }}>
                     <div
@@ -696,8 +726,8 @@ function ProjectCard({ project, index }: { project: (typeof projects)[0]; index:
                 <div
                   style={{
                     fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-                    fontSize: "10px",
-                    color: "#aaa",
+                    fontSize: "11px",
+                    color: "#555",
                     textTransform: "uppercase",
                     letterSpacing: "0.07em",
                     marginBottom: "4px",
@@ -722,7 +752,7 @@ export function ProjectsSection() {
     <section
       id="projects"
       style={{
-        maxWidth: "660px",
+        maxWidth: "860px",
         margin: "0 auto",
         padding: "0 24px 96px",
       }}
@@ -730,14 +760,16 @@ export function ProjectsSection() {
       <p
         style={{
           fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-          fontSize: "10px",
-          color: "#aaa",
+          fontSize: "11px",
+          color: "#111",
           textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          marginBottom: "24px",
+          letterSpacing: "0.12em",
+          marginBottom: "32px",
+          borderLeft: "3px solid #111",
+          paddingLeft: "12px",
         }}
       >
-        Projects — things I built to scratch my own itch
+        Projects
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>

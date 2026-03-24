@@ -126,7 +126,9 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-color: #fafaf8;
+    background-color: #e4e9ee;
+    background-image: radial-gradient(ellipse 120% 80% at 50% 10%, #f0f4f8 0%, #e4e9ee 55%, #d8dfe6 100%);
+    background-attachment: scroll;
   }
 }
 
@@ -148,5 +150,5 @@
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #fafaf8; }
+::-webkit-scrollbar-track { background: #e4e9ee; }
 ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }

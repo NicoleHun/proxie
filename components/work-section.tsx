@@ -91,8 +91,8 @@ function WorkCard({ job, index }: { job: (typeof workHistory)[0]; index: number 
             <span
               style={{
                 fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-                fontSize: "9px",
-                color: "#bbb",
+                fontSize: "11px",
+                color: "#555",
                 textTransform: "uppercase",
                 letterSpacing: "0.07em",
               }}
@@ -103,8 +103,8 @@ function WorkCard({ job, index }: { job: (typeof workHistory)[0]; index: number 
           <div
             style={{
               fontFamily: "'DM Sans', sans-serif",
-              fontSize: "13px",
-              color: "#888",
+              fontSize: "14px",
+              color: "#555",
               fontWeight: "300",
             }}
           >
@@ -116,8 +116,8 @@ function WorkCard({ job, index }: { job: (typeof workHistory)[0]; index: number 
           <span
             style={{
               fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-              fontSize: "10px",
-              color: "#bbb",
+              fontSize: "12px",
+              color: "#555",
               letterSpacing: "0.03em",
             }}
           >
@@ -184,7 +184,7 @@ export function WorkSection() {
     <section
       id="experience"
       style={{
-        maxWidth: "660px",
+        maxWidth: "860px",
         margin: "0 auto",
         padding: "0 24px 96px",
       }}
@@ -192,11 +192,13 @@ export function WorkSection() {
       <p
         style={{
           fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-          fontSize: "10px",
-          color: "#aaa",
+          fontSize: "11px",
+          color: "#111",
           textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          marginBottom: "24px",
+          letterSpacing: "0.12em",
+          marginBottom: "32px",
+          borderLeft: "3px solid #111",
+          paddingLeft: "12px",
         }}
       >
         Experience
@@ -217,7 +219,7 @@ export function WorkSection() {
           style={{
             fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
             fontSize: "10px",
-            color: "#aaa",
+            color: "#111",
             textTransform: "uppercase",
             letterSpacing: "0.07em",
             textDecoration: "underline",
